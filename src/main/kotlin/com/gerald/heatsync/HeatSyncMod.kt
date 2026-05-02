@@ -14,8 +14,7 @@ class HeatSyncMod(modLoadingContext: FMLJavaModLoadingContext) {
         modLoadingContext.registerConfig(ModConfig.Type.COMMON, HeatSyncConfig.SPEC)
 
         if (ModList.get().isLoaded(HeatSyncColdSweatBridge.COLD_SWEAT_MOD_ID)) {
-            val modBus = modLoadingContext.modEventBus
-            HeatSyncColdSweatBridge.initialize(modBus)
+            HeatSyncColdSweatBridge.initialize(MinecraftForge.EVENT_BUS)
             MinecraftForge.EVENT_BUS.register(HeatSyncPipeThermalController)
         }
 
