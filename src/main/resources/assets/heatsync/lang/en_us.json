@@ -1,0 +1,12 @@
+{
+  "block.heatsync.coolant_exchanger": "Coolant Exchanger",
+  "block.heatsync.creative_heat_source": "Creative Heat Source",
+  "block.heatsync.creative_cold_source": "Creative Cold Source",
+  "block.heatsync.hot_water": "Hot Water",
+  "item.heatsync.hot_water_bucket": "Hot Water Bucket",
+  "fluid_type.heatsync.hot_water": "Hot Water",
+  "tooltip.heatsync.mode.heating": "Mode: Heating coolant",
+  "tooltip.heatsync.mode.cooling": "Mode: Cooling coolant",
+  "block.heatsync.heat_pipe": "Heat Pipe",
+  "tooltip.heatsync.heat": "Heat: %s / %s"
+}

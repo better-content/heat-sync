@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "heatsync:block/heat_pipe"
+    }
+  }
+}

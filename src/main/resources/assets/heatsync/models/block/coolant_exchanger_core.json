@@ -1,0 +1,78 @@
+{
+  "textures": {
+    "casing": "minecraft:block/copper_block",
+    "panel": "minecraft:block/cut_copper",
+    "window": "minecraft:block/light_blue_stained_glass",
+    "heat": "minecraft:block/magma",
+    "pipe": "minecraft:block/oxidized_copper",
+    "frame": "minecraft:block/exposed_cut_copper"
+  },
+  "elements": [
+    {
+      "from": [2, 0, 2],
+      "to": [14, 16, 14],
+      "faces": {
+        "down": {"texture": "#casing"},
+        "up": {"texture": "#casing"},
+        "north": {"texture": "#frame"},
+        "south": {"texture": "#frame"},
+        "west": {"texture": "#frame"},
+        "east": {"texture": "#frame"}
+      }
+    },
+    {
+      "from": [3, 1, 3],
+      "to": [13, 15, 13],
+      "faces": {
+        "down": {"texture": "#panel"},
+        "up": {"texture": "#panel"},
+        "north": {"texture": "#panel"},
+        "south": {"texture": "#panel"},
+        "west": {"texture": "#panel"},
+        "east": {"texture": "#panel"}
+      }
+    },
+    {
+      "from": [4, 4, 1],
+      "to": [12, 12, 2],
+      "faces": {
+        "north": {"texture": "#window"}
+      }
+    },
+    {
+      "from": [4, 4, 14],
+      "to": [12, 12, 15],
+      "faces": {
+        "south": {"texture": "#window"}
+      }
+    },
+    {
+      "from": [1, 4, 4],
+      "to": [2, 12, 12],
+      "faces": {
+        "west": {"texture": "#window"}
+      }
+    },
+    {
+      "from": [14, 4, 4],
+      "to": [15, 12, 12],
+      "faces": {
+        "east": {"texture": "#window"}
+      }
+    },
+    {
+      "from": [4, 14, 4],
+      "to": [12, 15, 12],
+      "faces": {
+        "up": {"texture": "#heat"}
+      }
+    },
+    {
+      "from": [4, 1, 4],
+      "to": [12, 2, 12],
+      "faces": {
+        "down": {"texture": "#pipe"}
+      }
+    }
+  ]
+}

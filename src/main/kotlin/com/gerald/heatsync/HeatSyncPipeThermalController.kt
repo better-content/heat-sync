@@ -13,9 +13,10 @@ import net.minecraftforge.event.level.BlockEvent
 import net.minecraftforge.event.level.ChunkEvent
 import net.minecraftforge.event.level.LevelEvent
 import net.minecraftforge.eventbus.api.SubscribeEvent
-import org.antarcticgardens.cna.content.heat.pipe.HeatPipeBlock
-import org.antarcticgardens.cna.content.heat.HeatBlockEntity
-import org.antarcticgardens.cna.content.heat.pipe.HeatPipeBlockEntity
+import com.gerald.heatsync.api.HeatBlockEntity
+import com.gerald.heatsync.api.HeatCapabilities
+import com.gerald.heatsync.content.heat.HeatPipeBlock
+import com.gerald.heatsync.content.heat.HeatPipeBlockEntity
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet
 import kotlin.math.abs
 
@@ -129,7 +130,7 @@ object HeatSyncPipeThermalController {
     }
 
     private fun updatePipe(level: Level, pipe: HeatPipeBlockEntity, parameters: ThermalStepParameters) {
-        val currentHeat = pipe.heat.toDouble()
+        val currentHeat = pipe.getHeat().toDouble()
         val ambientHeat = ColdSweatAmbientSampler.samplePipeHeat(level, pipe.blockPos)
         val neighborAverage = resolveNeighborAverage(level, pipe.blockPos, pipe)
         val sourceHeat = resolveSourceHeat(level, pipe.blockPos)
@@ -159,12 +160,13 @@ object HeatSyncPipeThermalController {
         var neighborCount = 0
 
         for (direction in DIRECTIONS) {
-            val neighbor = level.getBlockEntity(pos.relative(direction)) as? HeatBlockEntity ?: continue
-            if (!neighbor.canAdd(direction) || !pipe.canAdd(direction.opposite)) {
+            val neighborEntity = level.getBlockEntity(pos.relative(direction)) ?: continue
+            val neighbor = neighborEntity.getCapability(HeatCapabilities.HEAT, direction.opposite).resolve().orElse(null) ?: continue
+            if (!neighbor.canAdd(direction.opposite) || !pipe.canAdd(direction)) {
                 continue
             }
 
-            totalHeat += neighbor.heat.toDouble()
+            totalHeat += neighbor.getHeat().toDouble()
             neighborCount++
         }
 

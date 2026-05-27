@@ -1,0 +1,115 @@
+{
+  "multipart": [
+    {
+      "apply": {
+        "model": "heatsync:block/coolant_exchanger_core"
+      }
+    },
+    {
+      "when": {
+        "north": "fluid"
+      },
+      "apply": {
+        "model": "heatsync:block/coolant_exchanger_port_fluid"
+      }
+    },
+    {
+      "when": {
+        "east": "fluid"
+      },
+      "apply": {
+        "model": "heatsync:block/coolant_exchanger_port_fluid",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "south": "fluid"
+      },
+      "apply": {
+        "model": "heatsync:block/coolant_exchanger_port_fluid",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "west": "fluid"
+      },
+      "apply": {
+        "model": "heatsync:block/coolant_exchanger_port_fluid",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "up": "fluid"
+      },
+      "apply": {
+        "model": "heatsync:block/coolant_exchanger_port_fluid",
+        "x": 270
+      }
+    },
+    {
+      "when": {
+        "down": "fluid"
+      },
+      "apply": {
+        "model": "heatsync:block/coolant_exchanger_port_fluid",
+        "x": 90
+      }
+    },
+    {
+      "when": {
+        "north": "heat"
+      },
+      "apply": {
+        "model": "heatsync:block/coolant_exchanger_port_heat"
+      }
+    },
+    {
+      "when": {
+        "east": "heat"
+      },
+      "apply": {
+        "model": "heatsync:block/coolant_exchanger_port_heat",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "south": "heat"
+      },
+      "apply": {
+        "model": "heatsync:block/coolant_exchanger_port_heat",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "west": "heat"
+      },
+      "apply": {
+        "model": "heatsync:block/coolant_exchanger_port_heat",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "up": "heat"
+      },
+      "apply": {
+        "model": "heatsync:block/coolant_exchanger_port_heat",
+        "x": 270
+      }
+    },
+    {
+      "when": {
+        "down": "heat"
+      },
+      "apply": {
+        "model": "heatsync:block/coolant_exchanger_port_heat",
+        "x": 90
+      }
+    }
+  ]
+}

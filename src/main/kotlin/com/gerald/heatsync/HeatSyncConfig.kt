@@ -23,6 +23,11 @@ object HeatSyncConfig {
     private val pipeBlockTempRangeValue: ForgeConfigSpec.DoubleValue
     private val pipeBlockTempMaxEffectValue: ForgeConfigSpec.DoubleValue
 
+    private val powerGridAmbientHeatValue: ForgeConfigSpec.DoubleValue
+    private val powerGridAmbientTemperatureValue: ForgeConfigSpec.DoubleValue
+    private val powerGridHeatPerDegreeValue: ForgeConfigSpec.DoubleValue
+    private val powerGridMaxHeatValue: ForgeConfigSpec.DoubleValue
+
     val SPEC: ForgeConfigSpec
 
     init {
@@ -80,6 +85,21 @@ object HeatSyncConfig {
             .defineInRange("pipe_blocktemp_max_effect", 0.75, 0.0, Double.MAX_VALUE)
         builder.pop()
 
+        builder.push("power_grid")
+        powerGridAmbientHeatValue = builder
+            .comment("HeatSync heat value corresponding to Power Grid ambient device temperature.")
+            .defineInRange("ambient_heat", 100.0, 0.0, Double.MAX_VALUE)
+        powerGridAmbientTemperatureValue = builder
+            .comment("Power Grid ambient device temperature in Celsius.")
+            .defineInRange("ambient_temperature_c", 22.0, -273.15, Double.MAX_VALUE)
+        powerGridHeatPerDegreeValue = builder
+            .comment("HeatSync heat units per one Power Grid Celsius degree. Default maps 1200 C near HeatSync 400.")
+            .defineInRange("heat_per_degree_c", 0.25466893039049235, 0.0001, Double.MAX_VALUE)
+        powerGridMaxHeatValue = builder
+            .comment("Maximum HeatSync heat exposed by Power Grid thermal devices.")
+            .defineInRange("max_heat", 400.0, 1.0, Double.MAX_VALUE)
+        builder.pop()
+
         SPEC = builder.build()
     }
 
@@ -110,4 +130,12 @@ object HeatSyncConfig {
     fun pipeBlockTempRange(): Double = pipeBlockTempRangeValue.get()
 
     fun pipeBlockTempMaxEffect(): Double = pipeBlockTempMaxEffectValue.get()
+
+    fun powerGridAmbientHeat(): Double = powerGridAmbientHeatValue.get()
+
+    fun powerGridAmbientTemperature(): Double = powerGridAmbientTemperatureValue.get()
+
+    fun powerGridHeatPerDegree(): Double = powerGridHeatPerDegreeValue.get()
+
+    fun powerGridMaxHeat(): Double = powerGridMaxHeatValue.get()
 }

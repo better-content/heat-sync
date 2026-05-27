@@ -6,8 +6,8 @@ import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.level.Level
 import net.minecraft.world.level.block.Block
 import net.minecraft.world.level.block.state.BlockState
-import org.antarcticgardens.cna.content.heat.HeatBlockEntity
-import org.antarcticgardens.cna.content.heat.pipe.HeatPipeBlock
+import com.gerald.heatsync.api.HeatCapabilities
+import com.gerald.heatsync.content.heat.HeatPipeBlock
 
 class PipeBlockTemp : BlockTemp(
     -HeatSyncConfig.pipeBlockTempMaxEffect(),
@@ -29,11 +29,13 @@ class PipeBlockTemp : BlockTemp(
         }
 
         val blockEntity = level.getBlockEntity(pos)
-        val pipeHeat = when (blockEntity) {
-            is HeatBlockEntity -> blockEntity.heat.toDouble()
-            is PipeHeatProvider -> blockEntity.pipeHeat
-            else -> return 0.0
-        }
+        val pipeHeat = blockEntity
+            ?.getCapability(HeatCapabilities.HEAT)
+            ?.map { it.getHeat().toDouble() }
+            ?.orElseGet {
+                if (blockEntity is PipeHeatProvider) blockEntity.pipeHeat else 0.0
+            }
+            ?: 0.0
         val emitted = ColdSweatHeatMapper.pipeHeatToColdSweat(pipeHeat)
         val maxEffect = HeatSyncConfig.pipeBlockTempMaxEffect()
         return emitted.coerceIn(-maxEffect, maxEffect)
@@ -44,5 +46,6 @@ class PipeBlockTemp : BlockTemp(
 
     override fun isValid(level: Level, pos: BlockPos, state: BlockState): Boolean =
         (state.block is HeatPipeBlock || state.`is`(HeatSyncColdSweatBridge.PIPE_RADIATORS))
-            && (level.getBlockEntity(pos) is HeatBlockEntity || level.getBlockEntity(pos) is PipeHeatProvider)
+            && (level.getBlockEntity(pos)?.getCapability(HeatCapabilities.HEAT)?.isPresent == true ||
+            level.getBlockEntity(pos) is PipeHeatProvider)
 }

@@ -40,30 +40,9 @@ ordering="AFTER"
 side="BOTH"
 
 [[dependencies.${modId}]]
-modId="create_new_age"
-mandatory=true
-versionRange="[${createNewAgeVersion},)"
-ordering="AFTER"
-side="BOTH"
-
-[[dependencies.${modId}]]
 modId="chemlib"
 mandatory=true
 versionRange="[${chemlibVersion},)"
-ordering="AFTER"
-side="BOTH"
-
-[[dependencies.${modId}]]
-modId="alchemylib"
-mandatory=true
-versionRange="[${alchemylibVersion},)"
-ordering="AFTER"
-side="BOTH"
-
-[[dependencies.${modId}]]
-modId="alchemistry"
-mandatory=true
-versionRange="[${alchemistryVersion},)"
 ordering="AFTER"
 side="BOTH"
 

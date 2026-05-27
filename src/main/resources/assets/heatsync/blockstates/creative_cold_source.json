@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "heatsync:block/creative_cold_source"
+    }
+  }
+}
