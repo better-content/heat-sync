@@ -297,6 +297,23 @@ tasks.named("sourcesJar") {
     dependsOn(generateHotFluidTextures, generateBundledCoolantIndex)
 }
 
+tasks.named<Jar>("jar") {
+    finalizedBy("reobfJar")
+}
+
+val stageRuntimeJar by tasks.registering(Copy::class) {
+    group = "build"
+    description = "Stages the reobfuscated runtime jar into build/libs using the canonical release filename."
+    dependsOn(tasks.named("reobfJar"))
+    from(layout.buildDirectory.file("reobfJar/output.jar"))
+    into(layout.buildDirectory.dir("libs"))
+    rename { "${base.archivesName.get()}-$version.jar" }
+}
+
+tasks.named("assemble") {
+    dependsOn(stageRuntimeJar)
+}
+
 val syncGameTestStructures by tasks.registering(Sync::class) {
     from(layout.projectDirectory.dir("gameteststructures"))
     into(layout.projectDirectory.dir("run/gameteststructures"))
@@ -308,6 +325,12 @@ tasks.matching { it.name == "prepareRunGameTestServer" }.configureEach {
 
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
+}
+
+tasks.register("headlessGameTest") {
+    group = "verification"
+    description = "Runs Forge game tests in a headless dedicated server."
+    dependsOn(tasks.named("runGameTestServer"))
 }
 
 jacoco {
