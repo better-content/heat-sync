@@ -378,3 +378,16 @@ tasks.jacocoTestCoverageVerification {
 tasks.check {
     dependsOn(tasks.jacocoTestReport, tasks.jacocoTestCoverageVerification)
 }
+
+tasks.register("verifyFast") {
+    group = "verification"
+    description = "Runs the fast deterministic verification lane."
+    dependsOn(tasks.named("check"))
+}
+
+tasks.register("verifyFull") {
+    group = "verification"
+    description = "Runs the full verification lane, including headless Forge GameTests."
+    dependsOn(tasks.named("verifyFast"))
+    dependsOn(tasks.named("headlessGameTest"))
+}

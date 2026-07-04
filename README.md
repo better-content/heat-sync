@@ -24,9 +24,8 @@ The common config defines:
 ./gradlew runClient
 ./gradlew runServer
 ./gradlew runData
-./gradlew test
-./gradlew jacocoTestReport
-./gradlew build
+./gradlew verifyFast
+./gradlew verifyFull
 ```
 
 ## Dependencies
@@ -49,7 +48,7 @@ Optional integrations:
 ## Release
 
 ```bash
-./gradlew clean check build
+./gradlew verifyFull
 ```
 
 Build outputs:
