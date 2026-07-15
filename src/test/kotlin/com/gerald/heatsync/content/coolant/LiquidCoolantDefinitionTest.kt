@@ -92,6 +92,8 @@ class LiquidCoolantDefinitionTest {
 
         assertTrue(definition.matchesCold(id("minecraft:water")))
         assertTrue(definition.matchesHot(id("heatsync:hot_water")))
+        assertTrue(!definition.matchesCold(id("heatsync:hot_water")))
+        assertTrue(!definition.matchesHot(id("minecraft:water")))
     }
 
     private fun id(value: String): ResourceLocation = ResourceLocation.parse(value)
