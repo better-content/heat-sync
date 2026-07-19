@@ -64,3 +64,7 @@ Coverage outputs:
 
 - Cold Sweat is optional. Without it, HeatSync loads but does not register the bridge hooks.
 - Development dependencies are resolved from Forge, Create, Modrinth, Curse Maven, and Kotlin for Forge repositories declared in `build.gradle.kts`.
+
+## Community and support
+
+For modpack and mod discussion, playtest feedback, and bug reports, join the [Better Content Discord](https://discord.gg/EkRnZbzqS9).
