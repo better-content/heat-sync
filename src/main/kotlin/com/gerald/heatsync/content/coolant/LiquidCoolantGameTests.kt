@@ -51,7 +51,7 @@ class LiquidCoolantGameTests {
                 tankFluid.fluid === net.minecraft.world.level.material.Fluids.WATER,
                 "Expected water after cooling, found ${tankFluid.fluid.fluidType.descriptionId}",
             )
-            helper.assertTrue(blockEntity.getHeat() == 650.0f, "Expected remaining heat to be 650.0, was ${blockEntity.getHeat()}")
+            helper.assertTrue(blockEntity.getHeat() == 420.0f, "Expected remaining heat to be 420.0, was ${blockEntity.getHeat()}")
         }
     }
 

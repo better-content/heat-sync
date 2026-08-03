@@ -17,7 +17,7 @@ class LiquidCoolantDefinitionTest {
               "cold_fluid": "minecraft:water",
               "hot_fluid": "heatsync:hot_water",
               "heat_per_bucket": 400.0,
-              "cooling_per_bucket": 550.0
+              "cooling_per_bucket": 320.0
             }
             """.trimIndent(),
         ).asJsonObject
@@ -27,7 +27,7 @@ class LiquidCoolantDefinitionTest {
         assertEquals(id("minecraft:water"), definition.coldFluid)
         assertEquals(id("heatsync:hot_water"), definition.hotFluid)
         assertEquals(400.0f, definition.heatPerBucket)
-        assertEquals(550.0f, definition.coolingPerBucket)
+        assertEquals(320.0f, definition.coolingPerBucket)
     }
 
     @Test
@@ -37,12 +37,12 @@ class LiquidCoolantDefinitionTest {
             coldFluid = id("minecraft:water"),
             hotFluid = id("heatsync:hot_water"),
             heatPerBucket = 400.0f,
-            coolingPerBucket = 550.0f,
+            coolingPerBucket = 320.0f,
         )
 
         assertEquals(400.0f, definition.heatRequired(FluidType.BUCKET_VOLUME))
         assertEquals(100.0f, definition.heatRequired(250))
-        assertEquals(275.0f, definition.coolingRequired(500))
+        assertEquals(160.0f, definition.coolingRequired(500))
     }
 
     @Test
@@ -53,7 +53,7 @@ class LiquidCoolantDefinitionTest {
                 coldFluid = id("minecraft:water"),
                 hotFluid = id("minecraft:water"),
                 heatPerBucket = 400.0f,
-                coolingPerBucket = 550.0f,
+                coolingPerBucket = 320.0f,
             )
         }
 
@@ -63,7 +63,7 @@ class LiquidCoolantDefinitionTest {
                 coldFluid = id("minecraft:water"),
                 hotFluid = id("heatsync:hot_water"),
                 heatPerBucket = 0.0f,
-                coolingPerBucket = 550.0f,
+                coolingPerBucket = 320.0f,
             )
         }
         assertTrue(badHeat.message.orEmpty().contains("heat_per_bucket"))
@@ -78,6 +78,17 @@ class LiquidCoolantDefinitionTest {
             )
         }
         assertTrue(badCooling.message.orEmpty().contains("cooling_per_bucket"))
+
+        val energyPositiveLoop = assertFailsWith<IllegalArgumentException> {
+            LiquidCoolantDefinition(
+                id = id("heatsync:energy_positive"),
+                coldFluid = id("minecraft:water"),
+                hotFluid = id("heatsync:hot_water"),
+                heatPerBucket = 400.0f,
+                coolingPerBucket = 401.0f,
+            )
+        }
+        assertTrue(energyPositiveLoop.message.orEmpty().contains("must be <= heat_per_bucket"))
     }
 
     @Test
@@ -87,7 +98,7 @@ class LiquidCoolantDefinitionTest {
             coldFluid = id("minecraft:water"),
             hotFluid = id("heatsync:hot_water"),
             heatPerBucket = 400.0f,
-            coolingPerBucket = 550.0f,
+            coolingPerBucket = 320.0f,
         )
 
         assertTrue(definition.matchesCold(id("minecraft:water")))

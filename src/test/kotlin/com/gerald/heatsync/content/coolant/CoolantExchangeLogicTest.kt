@@ -11,7 +11,7 @@ class CoolantExchangeLogicTest {
         coldFluid = id("minecraft:water"),
         hotFluid = id("heatsync:hot_water"),
         heatPerBucket = 400.0f,
-        coolingPerBucket = 550.0f,
+        coolingPerBucket = 320.0f,
     )
 
     @Test
@@ -54,7 +54,7 @@ class CoolantExchangeLogicTest {
 
         requireNotNull(result)
         assertEquals(id("minecraft:water"), result.targetFluid)
-        assertEquals(650.0f, result.resultingHeat)
+        assertEquals(420.0f, result.resultingHeat)
     }
 
     @Test
@@ -62,7 +62,7 @@ class CoolantExchangeLogicTest {
         val result = CoolantExchangeLogic.computeExchange(
             fluidId = id("heatsync:hot_water"),
             amount = 1000,
-            currentHeat = 251.0f,
+            currentHeat = 481.0f,
             maxHeat = 800.0f,
             definition = definition,
         )
@@ -103,7 +103,7 @@ class CoolantExchangeLogicTest {
         val result = CoolantExchangeLogic.computeExchange(
             fluidId = id("heatsync:hot_water"),
             amount = 1000,
-            currentHeat = 250.0f,
+            currentHeat = 480.0f,
             maxHeat = 800.0f,
             definition = definition,
         )

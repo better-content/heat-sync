@@ -15,6 +15,9 @@ data class LiquidCoolantDefinition(
     init {
         require(heatPerBucket > 0f) { "heat_per_bucket must be > 0 for $id" }
         require(coolingPerBucket > 0f) { "cooling_per_bucket must be > 0 for $id" }
+        require(coolingPerBucket <= heatPerBucket) {
+            "cooling_per_bucket must be <= heat_per_bucket for $id"
+        }
         require(coldFluid != hotFluid) { "cold_fluid and hot_fluid must be different for $id" }
     }
 
