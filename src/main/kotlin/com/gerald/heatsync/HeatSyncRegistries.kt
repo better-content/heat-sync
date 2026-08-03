@@ -8,6 +8,8 @@ import com.gerald.heatsync.content.heat.ConstantTemperatureBlock
 import com.gerald.heatsync.content.heat.ConstantTemperatureBlockEntity
 import com.gerald.heatsync.content.heat.HeatPipeBlock
 import com.gerald.heatsync.content.heat.HeatPipeBlockEntity
+import com.gerald.heatsync.content.heat.ThermalFireboxBlock
+import com.gerald.heatsync.content.heat.ThermalFireboxBlockEntity
 import com.mojang.datafixers.DSL
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.world.item.BlockItem
@@ -60,6 +62,17 @@ object HeatSyncRegistries {
     val HEAT_PIPE_BLOCK_ENTITY: RegistryObject<BlockEntityType<HeatPipeBlockEntity>> =
         BLOCK_ENTITY_TYPES.register("heat_pipe") {
             BlockEntityType.Builder.of(::HeatPipeBlockEntity, HEAT_PIPE.get()).build(DSL.remainderType())
+        }
+
+    val THERMAL_FIREBOX: RegistryObject<Block> = BLOCKS.register("thermal_firebox", ::ThermalFireboxBlock)
+
+    val THERMAL_FIREBOX_ITEM: RegistryObject<Item> = ITEMS.register("thermal_firebox") {
+        BlockItem(THERMAL_FIREBOX.get(), Item.Properties())
+    }
+
+    val THERMAL_FIREBOX_BLOCK_ENTITY: RegistryObject<BlockEntityType<ThermalFireboxBlockEntity>> =
+        BLOCK_ENTITY_TYPES.register("thermal_firebox") {
+            BlockEntityType.Builder.of(::ThermalFireboxBlockEntity, THERMAL_FIREBOX.get()).build(DSL.remainderType())
         }
 
     val CREATIVE_HEAT_SOURCE: RegistryObject<Block> = BLOCKS.register("creative_heat_source") {

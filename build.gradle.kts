@@ -31,6 +31,8 @@ val coldSweatModrinthVersionId = property("cold_sweat_modrinth_version_id") as S
 val emiVersion = property("emi_version") as String
 val emiCurseFileId = property("emi_curse_file_id") as String
 val powerGridVersion = property("powergrid_version") as String
+val pneumaticCraftCurseFileId = property("pneumaticcraft_curse_file_id") as String
+val ae2CurseFileId = property("ae2_curse_file_id") as String
 val modId = property("mod_id") as String
 val modName = property("mod_name") as String
 val modVersion = property("mod_version") as String
@@ -252,6 +254,8 @@ dependencies {
     compileOnly(deobf("curse.maven:emi-580555:$emiCurseFileId"))
     runtimeOnly(deobf("curse.maven:emi-580555:$emiCurseFileId"))
     compileOnly(deobf("maven.modrinth:power-grid:$powerGridVersion"))
+    compileOnly(deobf("curse.maven:pneumaticcraft-repressurized-281849:$pneumaticCraftCurseFileId"))
+    compileOnly(deobf("curse.maven:applied-energistics-2-223794:$ae2CurseFileId"))
 
     testImplementation(kotlin("test"))
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")

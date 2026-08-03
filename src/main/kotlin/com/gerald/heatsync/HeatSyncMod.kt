@@ -2,6 +2,7 @@ package com.gerald.heatsync
 
 import com.gerald.heatsync.command.HeatSyncCommands
 import com.gerald.heatsync.compat.powergrid.PowerGridHeatBridge
+import com.gerald.heatsync.compat.pneumaticcraft.PneumaticHeatBridge
 import com.gerald.heatsync.content.coolant.LiquidCoolantManager
 import com.mojang.logging.LogUtils
 import net.minecraftforge.event.AddReloadListenerEvent
@@ -19,6 +20,9 @@ class HeatSyncMod(modLoadingContext: FMLJavaModLoadingContext) {
     init {
         val modBus = modLoadingContext.modEventBus
         HeatSyncRegistries.register(modBus)
+        if (ModList.get().isLoaded(HeatSyncAe2Registries.MOD_ID)) {
+            HeatSyncAe2Registries.register(modBus)
+        }
         if (FMLEnvironment.dist.isClient) {
             HeatSyncClient.register(modBus)
         }
@@ -33,6 +37,9 @@ class HeatSyncMod(modLoadingContext: FMLJavaModLoadingContext) {
         }
         if (ModList.get().isLoaded(PowerGridHeatBridge.MOD_ID)) {
             PowerGridHeatBridge.initialize(MinecraftForge.EVENT_BUS)
+        }
+        if (ModList.get().isLoaded(PneumaticHeatBridge.MOD_ID)) {
+            PneumaticHeatBridge.initialize(MinecraftForge.EVENT_BUS)
         }
 
         LOGGER.info("Loaded mod {}", MOD_ID)

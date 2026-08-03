@@ -27,6 +27,15 @@ object HeatSyncConfig {
     private val powerGridAmbientTemperatureValue: ForgeConfigSpec.DoubleValue
     private val powerGridHeatPerDegreeValue: ForgeConfigSpec.DoubleValue
     private val powerGridMaxHeatValue: ForgeConfigSpec.DoubleValue
+    private val fireboxHeatPerTickValue: ForgeConfigSpec.DoubleValue
+    private val fireboxTargetHeatValue: ForgeConfigSpec.DoubleValue
+    private val pneumaticAmbientHeatValue: ForgeConfigSpec.DoubleValue
+    private val pneumaticAmbientTemperatureValue: ForgeConfigSpec.DoubleValue
+    private val pneumaticHeatPerKelvinValue: ForgeConfigSpec.DoubleValue
+    private val transducerFeCapacityValue: ForgeConfigSpec.IntValue
+    private val transducerFePerUnitValue: ForgeConfigSpec.IntValue
+    private val transducerUnitsPerTickValue: ForgeConfigSpec.IntValue
+    private val transducerMaxHeatValue: ForgeConfigSpec.DoubleValue
 
     val SPEC: ForgeConfigSpec
 
@@ -44,6 +53,42 @@ object HeatSyncConfig {
         pipeMaxHeatValue = builder
             .comment("Maximum pipe heat.")
             .defineInRange("pipe_max_heat", 400.0, 0.0, Double.MAX_VALUE)
+        builder.pop()
+
+        builder.push("thermal_firebox")
+        fireboxHeatPerTickValue = builder
+            .comment("HeatSync heat released per burning tick. Fuel duration remains the furnace burn duration.")
+            .defineInRange("heat_per_tick", 6.0, 0.0, Double.MAX_VALUE)
+        fireboxTargetHeatValue = builder
+            .comment("Firebox target heat. It stops consuming new fuel at or above this value.")
+            .defineInRange("target_heat", 360.0, 0.0, Double.MAX_VALUE)
+        builder.pop()
+
+        builder.push("pneumaticcraft")
+        pneumaticAmbientHeatValue = builder
+            .comment("HeatSync heat corresponding to PneumaticCraft ambient temperature.")
+            .defineInRange("ambient_heat", 100.0, 0.0, Double.MAX_VALUE)
+        pneumaticAmbientTemperatureValue = builder
+            .comment("PneumaticCraft ambient temperature in Kelvin.")
+            .defineInRange("ambient_temperature_k", 295.15, 0.0, Double.MAX_VALUE)
+        pneumaticHeatPerKelvinValue = builder
+            .comment("HeatSync heat units per PneumaticCraft Kelvin.")
+            .defineInRange("heat_per_kelvin", 0.25, 0.0001, Double.MAX_VALUE)
+        builder.pop()
+
+        builder.push("impossible_transducer")
+        transducerFeCapacityValue = builder
+            .comment("Containment-only Forge Energy buffer. FE is never converted into AE.")
+            .defineInRange("fe_capacity", 100_000, 1, Int.MAX_VALUE)
+        transducerFePerUnitValue = builder
+            .comment("Containment FE consumed per finite source-owned unbinding unit.")
+            .defineInRange("fe_per_unit", 2_000, 1, Int.MAX_VALUE)
+        transducerUnitsPerTickValue = builder
+            .comment("Fixed maximum unbinding units per transducer per tick; scale by parallel blocks.")
+            .defineInRange("units_per_tick", 1, 1, 64)
+        transducerMaxHeatValue = builder
+            .comment("Heat at which the transducer melts into lava after retaining unbinding heat.")
+            .defineInRange("max_heat", 400.0, 1.0, Double.MAX_VALUE)
         builder.pop()
 
         builder.push("pipe_behavior")
@@ -138,4 +183,22 @@ object HeatSyncConfig {
     fun powerGridHeatPerDegree(): Double = powerGridHeatPerDegreeValue.get()
 
     fun powerGridMaxHeat(): Double = powerGridMaxHeatValue.get()
+
+    fun fireboxHeatPerTick(): Float = fireboxHeatPerTickValue.get().toFloat()
+
+    fun fireboxTargetHeat(): Float = fireboxTargetHeatValue.get().toFloat()
+
+    fun pneumaticAmbientHeat(): Double = pneumaticAmbientHeatValue.get()
+
+    fun pneumaticAmbientTemperature(): Double = pneumaticAmbientTemperatureValue.get()
+
+    fun pneumaticHeatPerKelvin(): Double = pneumaticHeatPerKelvinValue.get()
+
+    fun transducerFeCapacity(): Int = transducerFeCapacityValue.get()
+
+    fun transducerFePerUnit(): Int = transducerFePerUnitValue.get()
+
+    fun transducerUnitsPerTick(): Long = transducerUnitsPerTickValue.get().toLong()
+
+    fun transducerMaxHeat(): Float = transducerMaxHeatValue.get().toFloat()
 }

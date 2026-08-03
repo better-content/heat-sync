@@ -8,5 +8,7 @@
   "tooltip.heatsync.mode.heating": "Mode: Heating coolant",
   "tooltip.heatsync.mode.cooling": "Mode: Cooling coolant",
   "block.heatsync.heat_pipe": "Heat Pipe",
-  "tooltip.heatsync.heat": "Heat: %s / %s"
+  "tooltip.heatsync.heat": "Heat: %s / %s",
+  "block.heatsync.thermal_firebox": "Thermal Firebox",
+  "block.heatsync.impossible_matter_transducer": "Impossible Matter Transducer"
 }
