@@ -53,8 +53,8 @@ Optional integrations:
 
 Build outputs:
 
-- `build/libs/heat_sync-<version>.jar`
-- `build/libs/heat_sync-<version>-sources.jar`
+- `build/libs/heat-sync-<version>.jar`
+- `build/libs/heat-sync-<version>-sources.jar`
 
 Coverage outputs:
 
