@@ -7,4 +7,4 @@ pluginManagement {
     }
 }
 
-rootProject.name = "heatsync"
+rootProject.name = "heat-sync"

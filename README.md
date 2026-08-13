@@ -1,4 +1,4 @@
-# HeatSync
+# Heat Sync
 
 HeatSync is a Minecraft `1.20.1` Forge mod built with Kotlin. It exposes Create: New Age heat pipes to Cold Sweat as ambient block temperature sources, so cold pipe networks can affect nearby entities.
 
@@ -7,7 +7,7 @@ HeatSync is a Minecraft `1.20.1` Forge mod built with Kotlin. It exposes Create:
 - Registers a Cold Sweat `BlockTemp` handler when Cold Sweat is installed.
 - Maps pipe heat values onto Cold Sweat world temperature with a configurable offset/scale model.
 - Rebalances loaded heat pipes every second using Cold Sweat ambient temperature, neighboring pipe heat, and nearby tagged cold sources.
-- Ships default tags under `data/heatsync/tags/blocks` for radiator and cold-source classification.
+- Ships default tags under `data/heat_sync/tags/blocks` for radiator and cold-source classification.
 
 ## Configuration
 
@@ -32,7 +32,7 @@ The common config defines:
 
 Required at runtime:
 
-- Minecraft Forge `47.4.10` (`1.20.1`)
+- Minecraft Forge `47.4.13` (`1.20.1`)
 - Kotlin for Forge `4.11.0`
 - Create `6.0.8`
 - Create: New Age `1.1.7f`
@@ -53,8 +53,8 @@ Optional integrations:
 
 Build outputs:
 
-- `build/libs/heatsync-<version>.jar`
-- `build/libs/heatsync-<version>-sources.jar`
+- `build/libs/heat_sync-<version>.jar`
+- `build/libs/heat_sync-<version>-sources.jar`
 
 Coverage outputs:
 
@@ -68,3 +68,7 @@ Coverage outputs:
 ## Community and support
 
 For modpack and mod discussion, playtest feedback, and bug reports, join the [Better Content Discord](https://discord.gg/EkRnZbzqS9).
+
+## Identity
+
+The clean-break canonical identity is repository/artifact `heat-sync`, mod ID and resource namespace `heat_sync`, and Maven group `com.bettercontent`. Legacy `heatsync` worlds and configs are not migrated.

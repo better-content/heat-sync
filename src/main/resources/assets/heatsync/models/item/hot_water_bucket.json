@@ -1,5 +1,0 @@
-{
-  "parent": "forge:item/default",
-  "loader": "forge:fluid_container",
-  "fluid": "heatsync:hot_water"
-}

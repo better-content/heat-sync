@@ -9,5 +9,9 @@ All notable changes to this project are documented in this file.
 - Cold Sweat block temperature bridge registration for Create: New Age heat pipes.
 - Pipe thermal update controller that applies ambient blending, network equalization, passive loss, and nearby cold-source pull.
 - Configurable thermal mapping and behavior via Forge common config.
-- Block tags for `heatsync:pipe_cold_sources` and `heatsync:pipe_radiators`.
+- Block tags for `heat_sync:pipe_cold_sources` and `heat_sync:pipe_radiators`.
 - Unit tests for mapping math and thermal step behavior.
+
+## Unreleased
+
+- Normalize the project identity to `heat-sync / heat_sync (formerly heatsync)`; this is a clean break with no legacy aliases or migrations.

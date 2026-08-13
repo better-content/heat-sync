@@ -43,7 +43,7 @@ group = property("mod_group") as String
 version = modVersion
 
 base {
-    archivesName.set(modId)
+    archivesName.set("heat-sync")
 }
 
 fun deobf(notation: String): Any =
@@ -342,8 +342,8 @@ jacoco {
 }
 
 val coverageClassPatterns = listOf(
-    "com/gerald/heatsync/HeatMappingMath*",
-    "com/gerald/heatsync/PipeThermalStepMath*"
+    "com/bettercontent/heatsync/HeatMappingMath*",
+    "com/bettercontent/heatsync/PipeThermalStepMath*"
 )
 
 tasks.jacocoTestReport {
@@ -367,8 +367,8 @@ tasks.jacocoTestCoverageVerification {
         rule {
             element = "CLASS"
             includes = listOf(
-                "com.gerald.heatsync.HeatMappingMath",
-                "com.gerald.heatsync.PipeThermalStepMath"
+                "com.bettercontent.heatsync.HeatMappingMath",
+                "com.bettercontent.heatsync.PipeThermalStepMath"
             )
             limit {
                 counter = "LINE"
