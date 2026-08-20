@@ -6,6 +6,8 @@ import com.bettercontent.heatsync.content.coolant.CoolantExchangerBlockEntity
 import com.bettercontent.heatsync.content.coolant.LiquidCoolantDefinition
 import com.bettercontent.heatsync.content.heat.ConstantTemperatureBlock
 import com.bettercontent.heatsync.content.heat.ConstantTemperatureBlockEntity
+import com.bettercontent.heatsync.content.heat.BoilerHeaterBlock
+import com.bettercontent.heatsync.content.heat.BoilerHeaterBlockEntity
 import com.bettercontent.heatsync.content.heat.HeatPipeBlock
 import com.bettercontent.heatsync.content.heat.HeatPipeBlockEntity
 import com.bettercontent.heatsync.content.heat.ThermalFireboxBlock
@@ -73,6 +75,17 @@ object HeatSyncRegistries {
     val THERMAL_FIREBOX_BLOCK_ENTITY: RegistryObject<BlockEntityType<ThermalFireboxBlockEntity>> =
         BLOCK_ENTITY_TYPES.register("thermal_firebox") {
             BlockEntityType.Builder.of(::ThermalFireboxBlockEntity, THERMAL_FIREBOX.get()).build(DSL.remainderType())
+        }
+
+    val BOILER_HEATER: RegistryObject<Block> = BLOCKS.register("boiler_heater", ::BoilerHeaterBlock)
+
+    val BOILER_HEATER_ITEM: RegistryObject<Item> = ITEMS.register("boiler_heater") {
+        BlockItem(BOILER_HEATER.get(), Item.Properties())
+    }
+
+    val BOILER_HEATER_BLOCK_ENTITY: RegistryObject<BlockEntityType<BoilerHeaterBlockEntity>> =
+        BLOCK_ENTITY_TYPES.register("boiler_heater") {
+            BlockEntityType.Builder.of(::BoilerHeaterBlockEntity, BOILER_HEATER.get()).build(DSL.remainderType())
         }
 
     val CREATIVE_HEAT_SOURCE: RegistryObject<Block> = BLOCKS.register("creative_heat_source") {

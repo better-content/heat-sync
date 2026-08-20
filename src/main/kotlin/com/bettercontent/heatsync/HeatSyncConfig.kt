@@ -1,5 +1,6 @@
 package com.bettercontent.heatsync
 
+import com.bettercontent.heatsync.content.heat.BoilerHeaterSettings
 import net.minecraftforge.common.ForgeConfigSpec
 
 object HeatSyncConfig {
@@ -36,6 +37,13 @@ object HeatSyncConfig {
     private val transducerFePerUnitValue: ForgeConfigSpec.IntValue
     private val transducerUnitsPerTickValue: ForgeConfigSpec.IntValue
     private val transducerMaxHeatValue: ForgeConfigSpec.DoubleValue
+    private val boilerHeaterMaxHeatValue: ForgeConfigSpec.DoubleValue
+    private val boilerHeaterFirstThresholdValue: ForgeConfigSpec.DoubleValue
+    private val boilerHeaterSecondThresholdValue: ForgeConfigSpec.DoubleValue
+    private val boilerHeaterThirdThresholdValue: ForgeConfigSpec.DoubleValue
+    private val boilerHeaterFirstCostValue: ForgeConfigSpec.DoubleValue
+    private val boilerHeaterSecondCostValue: ForgeConfigSpec.DoubleValue
+    private val boilerHeaterThirdCostValue: ForgeConfigSpec.DoubleValue
 
     val SPEC: ForgeConfigSpec
 
@@ -104,6 +112,18 @@ object HeatSyncConfig {
         coldSourcePullRateValue = builder
             .comment("How strongly adjacent cold sources pull a pipe toward their source heat.")
             .defineInRange("cold_source_pull_rate", 0.18, 0.0, 1.0)
+        builder.pop()
+
+        builder.push("boiler_heater")
+        boilerHeaterMaxHeatValue = builder
+            .comment("Maximum heat stored by a Boiler Heater.")
+            .defineInRange("max_heat", 400.0, 100.0, Double.MAX_VALUE)
+        boilerHeaterFirstThresholdValue = builder.defineInRange("strength_1_threshold", 180.0, 0.0, Double.MAX_VALUE)
+        boilerHeaterSecondThresholdValue = builder.defineInRange("strength_2_threshold", 260.0, 0.0, Double.MAX_VALUE)
+        boilerHeaterThirdThresholdValue = builder.defineInRange("strength_3_threshold", 340.0, 0.0, Double.MAX_VALUE)
+        boilerHeaterFirstCostValue = builder.defineInRange("strength_1_cost_per_tick", 1.0, 0.0, Double.MAX_VALUE)
+        boilerHeaterSecondCostValue = builder.defineInRange("strength_2_cost_per_tick", 2.0, 0.0, Double.MAX_VALUE)
+        boilerHeaterThirdCostValue = builder.defineInRange("strength_3_cost_per_tick", 3.0, 0.0, Double.MAX_VALUE)
         builder.pop()
 
         builder.push("cold_sources")
@@ -201,4 +221,15 @@ object HeatSyncConfig {
     fun transducerUnitsPerTick(): Long = transducerUnitsPerTickValue.get().toLong()
 
     fun transducerMaxHeat(): Float = transducerMaxHeatValue.get().toFloat()
+
+    fun boilerHeaterMaxHeat(): Float = boilerHeaterMaxHeatValue.get().toFloat()
+
+    fun boilerHeaterSettings(): BoilerHeaterSettings = BoilerHeaterSettings(
+        firstThreshold = boilerHeaterFirstThresholdValue.get().toFloat(),
+        secondThreshold = boilerHeaterSecondThresholdValue.get().toFloat(),
+        thirdThreshold = boilerHeaterThirdThresholdValue.get().toFloat(),
+        firstCost = boilerHeaterFirstCostValue.get().toFloat(),
+        secondCost = boilerHeaterSecondCostValue.get().toFloat(),
+        thirdCost = boilerHeaterThirdCostValue.get().toFloat(),
+    )
 }

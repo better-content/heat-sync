@@ -3,6 +3,8 @@ package com.bettercontent.heatsync
 import com.bettercontent.heatsync.command.HeatSyncCommands
 import com.bettercontent.heatsync.compat.powergrid.PowerGridHeatBridge
 import com.bettercontent.heatsync.compat.pneumaticcraft.PneumaticHeatBridge
+import com.bettercontent.heatsync.compat.create.CreateBoilerHeaterBridge
+import com.bettercontent.heatsync.compat.latent.LatentRadiogenicHeatBridge
 import com.bettercontent.heatsync.content.coolant.LiquidCoolantManager
 import com.mojang.logging.LogUtils
 import net.minecraftforge.event.AddReloadListenerEvent
@@ -13,6 +15,7 @@ import net.minecraftforge.fml.ModList
 import net.minecraftforge.fml.config.ModConfig
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext
 import net.minecraftforge.fml.loading.FMLEnvironment
+import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent
 import org.slf4j.Logger
 
 @Mod(HeatSyncMod.MOD_ID)
@@ -28,6 +31,7 @@ class HeatSyncMod(modLoadingContext: FMLJavaModLoadingContext) {
         }
 
         modLoadingContext.registerConfig(ModConfig.Type.COMMON, HeatSyncConfig.SPEC)
+        modBus.addListener(::onCommonSetup)
         MinecraftForge.EVENT_BUS.addListener(::onAddReloadListeners)
         MinecraftForge.EVENT_BUS.addListener(::onRegisterCommands)
         MinecraftForge.EVENT_BUS.register(HeatSyncPipeThermalController)
@@ -41,6 +45,9 @@ class HeatSyncMod(modLoadingContext: FMLJavaModLoadingContext) {
         if (ModList.get().isLoaded(PneumaticHeatBridge.MOD_ID)) {
             PneumaticHeatBridge.initialize(MinecraftForge.EVENT_BUS)
         }
+        if (ModList.get().isLoaded(LatentRadiogenicHeatBridge.MOD_ID)) {
+            LatentRadiogenicHeatBridge.initialize(MinecraftForge.EVENT_BUS)
+        }
 
         LOGGER.info("Loaded mod {}", MOD_ID)
     }
@@ -51,6 +58,10 @@ class HeatSyncMod(modLoadingContext: FMLJavaModLoadingContext) {
 
     private fun onRegisterCommands(event: RegisterCommandsEvent) {
         HeatSyncCommands.register(event.dispatcher)
+    }
+
+    private fun onCommonSetup(event: FMLCommonSetupEvent) {
+        event.enqueueWork(CreateBoilerHeaterBridge::register)
     }
 
     companion object {

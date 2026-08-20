@@ -73,3 +73,10 @@ mandatory=false
 versionRange="[${emiVersion},)"
 ordering="AFTER"
 side="CLIENT"
+
+[[dependencies.${modId}]]
+modId="latent_chemlib"
+mandatory=false
+versionRange="[0.1.0,)"
+ordering="AFTER"
+side="BOTH"
