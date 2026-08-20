@@ -2,7 +2,6 @@ package com.bettercontent.heatsync.compat.fiahi
 
 import com.hexagram2021.fiahi.common.config.FIAHICommonConfig
 import com.hexagram2021.fiahi.register.FIAHICapabilities
-import com.momosoftworks.coldsweat.config.ConfigSettings
 import net.minecraft.nbt.Tag
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.world.item.ItemStack
@@ -28,7 +27,7 @@ internal object FiahiFoodTemperatureAdapter {
         var result = stack
         stack.getCapability(FIAHICapabilities.FOOD_CAPABILITY).ifPresent { food ->
             val previousTemperature = food.temperature
-            food.foodTick(boundedTarget, stack.item)
+            FiahiTemperatureHooks.applyDirect(food, boundedTarget, stack.item, 1)
             changed = abs(food.temperature - previousTemperature) > EPSILON
             if (food.temperature > SPOILED_TEMPERATURE) {
                 val foodProperties = stack.item.foodProperties
@@ -49,14 +48,12 @@ internal object FiahiFoodTemperatureAdapter {
         val itemCount = pouchItemCount(tag)
         if (itemCount <= 0) return HeatingResult(stack, false)
         val current = tag.getDouble(POUCH_TEMPERATURE_KEY)
-        val balanced = FiahiHeatMath.balancePouchTemperature(
+        val balanced = FiahiHeatMath.balanceDirectTemperature(
             current = current,
             target = targetTemperature,
-            temperatureRate = ConfigSettings.TEMP_RATE.get(),
-            balanceRate = FIAHICommonConfig.TEMPERATURE_BALANCE_RATE.get() / 100.0,
             frozenMultiplier = FIAHICommonConfig.FROZEN_SPEED_MULTIPLIER.get(),
             rottenMultiplier = FIAHICommonConfig.ROTTEN_SPEED_MULTIPLIER.get(),
-            itemCount = itemCount,
+            thermalMass = FiahiHeatMath.effectivePouchMass(itemCount),
         )
         if (abs(balanced - current) <= EPSILON) return HeatingResult(stack, false)
         tag.putDouble(POUCH_TEMPERATURE_KEY, balanced)

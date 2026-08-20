@@ -1,0 +1,19 @@
+{
+  "required": false,
+  "minVersion": "0.8",
+  "package": "com.bettercontent.heatsync.mixin",
+  "plugin": "com.bettercontent.heatsync.mixin.HeatSyncMixinPlugin",
+  "compatibilityLevel": "JAVA_17",
+  "refmap": "heat_sync.refmap.json",
+  "mixins": [
+    "fiahi.FrozenRottenFoodMixin",
+    "fiahi.ForgeEventHandlerMixin",
+    "fiahi.ItemEntityMixin",
+    "fiahi.InventoryMixin",
+    "fiahi.BoilerBlockEntityMixin",
+    "fiahi.IceboxBlockEntityMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
