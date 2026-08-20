@@ -131,7 +131,7 @@ object HeatSyncPipeThermalController {
 
     private fun updatePipe(level: Level, pipe: HeatPipeBlockEntity, parameters: ThermalStepParameters) {
         val currentHeat = pipe.getHeat().toDouble()
-        val ambientHeat = ColdSweatAmbientSampler.samplePipeHeat(level, pipe.blockPos)
+        val ambientHeat = AmbientHeatSampling.samplePipeHeat(level, pipe.blockPos)
         val neighborAverage = resolveNeighborAverage(level, pipe.blockPos, pipe)
         val sourceHeat = resolveSourceHeat(level, pipe.blockPos)
         val nextHeat = PipeThermalMath.step(

@@ -4,6 +4,7 @@ import com.bettercontent.heatsync.command.HeatSyncCommands
 import com.bettercontent.heatsync.compat.powergrid.PowerGridHeatBridge
 import com.bettercontent.heatsync.compat.pneumaticcraft.PneumaticHeatBridge
 import com.bettercontent.heatsync.compat.create.CreateBoilerHeaterBridge
+import com.bettercontent.heatsync.compat.fiahi.FiahiHeatBridge
 import com.bettercontent.heatsync.compat.latent.LatentRadiogenicHeatBridge
 import com.bettercontent.heatsync.content.coolant.LiquidCoolantManager
 import com.mojang.logging.LogUtils
@@ -36,8 +37,11 @@ class HeatSyncMod(modLoadingContext: FMLJavaModLoadingContext) {
         MinecraftForge.EVENT_BUS.addListener(::onRegisterCommands)
         MinecraftForge.EVENT_BUS.register(HeatSyncPipeThermalController)
 
-        if (ModList.get().isLoaded(HeatSyncColdSweatBridge.COLD_SWEAT_MOD_ID)) {
+        if (ModList.get().isLoaded(COLD_SWEAT_MOD_ID)) {
             HeatSyncColdSweatBridge.initialize(MinecraftForge.EVENT_BUS)
+        }
+        if (ModList.get().isLoaded(FiahiHeatBridge.MOD_ID)) {
+            FiahiHeatBridge.initialize(MinecraftForge.EVENT_BUS)
         }
         if (ModList.get().isLoaded(PowerGridHeatBridge.MOD_ID)) {
             PowerGridHeatBridge.initialize(MinecraftForge.EVENT_BUS)
@@ -66,6 +70,7 @@ class HeatSyncMod(modLoadingContext: FMLJavaModLoadingContext) {
 
     companion object {
         const val MOD_ID: String = "heat_sync"
+        const val COLD_SWEAT_MOD_ID: String = "cold_sweat"
         val LOGGER: Logger = LogUtils.getLogger()
     }
 }

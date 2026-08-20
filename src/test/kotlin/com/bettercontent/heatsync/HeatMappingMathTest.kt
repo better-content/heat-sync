@@ -2,6 +2,7 @@ package com.bettercontent.heatsync
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class HeatMappingMathTest {
     @Test
@@ -18,5 +19,14 @@ class HeatMappingMathTest {
         assertEquals(0.0, HeatMappingMath.pipeHeatToColdSweat(100.0, 100.0, 40.0))
         assertEquals(-2.0, HeatMappingMath.pipeHeatToColdSweat(20.0, 100.0, 40.0))
         assertEquals(1.5, HeatMappingMath.pipeHeatToColdSweat(160.0, 100.0, 40.0))
+    }
+
+    @Test
+    fun `mapping round trips across the configured operating range`() {
+        listOf(0.0, 20.0, 60.0, 100.0, 180.0, 260.0, 340.0, 400.0).forEach { heat ->
+            val coldSweat = HeatMappingMath.pipeHeatToColdSweat(heat, 100.0, 40.0)
+            val roundTripped = HeatMappingMath.coldSweatToPipeHeat(coldSweat, 100.0, 40.0)
+            assertTrue(kotlin.math.abs(roundTripped - heat) < 0.000001, "$heat mapped back as $roundTripped")
+        }
     }
 }

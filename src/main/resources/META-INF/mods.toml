@@ -68,6 +68,13 @@ ordering="AFTER"
 side="BOTH"
 
 [[dependencies.${modId}]]
+modId="fiahi"
+mandatory=false
+versionRange="[${fiahiVersion},4)"
+ordering="AFTER"
+side="BOTH"
+
+[[dependencies.${modId}]]
 modId="emi"
 mandatory=false
 versionRange="[${emiVersion},)"

@@ -31,6 +31,19 @@ class RadiogenicHeatDistributionTest {
         assertEquals(30f, room.storedHeat)
     }
 
+    @Test
+    fun `non-positive emissions never mutate targets`() {
+        val target = Storage(100f)
+
+        assertEquals(0f, RadiogenicHeatDistribution.distribute(-20f, listOf(target)))
+        assertEquals(0f, target.storedHeat)
+    }
+
+    @Test
+    fun `empty target list returns the entire finite emission`() {
+        assertEquals(80f, RadiogenicHeatDistribution.distribute(80f, emptyList()))
+    }
+
     private class Storage(private val capacity: Float) : IHeatStorage {
         var storedHeat = 0f
         override fun getHeat(): Float = storedHeat

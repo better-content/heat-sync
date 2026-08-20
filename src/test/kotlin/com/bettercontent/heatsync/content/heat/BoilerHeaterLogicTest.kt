@@ -35,6 +35,8 @@ class BoilerHeaterLogicTest {
     fun `never reports output when configured cost cannot be paid`() {
         val expensive = settings.copy(firstCost = 200f)
         assertEquals(BoilerHeatDelivery(0, 0f, 180f), BoilerHeaterLogic.deliver(180f, true, expensive))
+        val invalid = settings.copy(firstCost = -1f)
+        assertEquals(BoilerHeatDelivery(0, 0f, 180f), BoilerHeaterLogic.deliver(180f, true, invalid))
     }
 
     @Test
@@ -51,5 +53,6 @@ class BoilerHeaterLogicTest {
         assertEquals(7, BoilerHeaterLogic.comparatorOutput(200f, 400f))
         assertEquals(15, BoilerHeaterLogic.comparatorOutput(400f, 400f))
         assertEquals(15, BoilerHeaterLogic.comparatorOutput(500f, 400f))
+        assertEquals(0, BoilerHeaterLogic.comparatorOutput(100f, 0f))
     }
 }

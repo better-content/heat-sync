@@ -26,7 +26,7 @@ object PipeThermalSourceResolver {
         state.`is`(Blocks.BLUE_ICE) -> HeatSyncConfig.blueIceSourceHeat()
         state.`is`(Blocks.PACKED_ICE) -> HeatSyncConfig.packedIceSourceHeat()
         state.`is`(Blocks.ICE) -> HeatSyncConfig.iceSourceHeat()
-        state.`is`(HeatSyncColdSweatBridge.PIPE_COLD_SOURCES) -> HeatSyncConfig.taggedColdSourceDefaultHeat()
+        state.`is`(HeatSyncThermalTags.PIPE_COLD_SOURCES) -> HeatSyncConfig.taggedColdSourceDefaultHeat()
         else -> null
     }
 }

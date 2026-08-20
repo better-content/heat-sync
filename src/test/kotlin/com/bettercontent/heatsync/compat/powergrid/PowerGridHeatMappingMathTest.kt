@@ -36,6 +36,21 @@ class PowerGridHeatMappingMathTest {
     }
 
     @Test
+    fun `temperatures below the configured floor clamp to minimum heat`() {
+        assertEquals(
+            20f,
+            PowerGridHeatMappingMath.temperatureToHeat(
+                temperatureC = -273.15f,
+                ambientTemperatureC = 22.0,
+                ambientHeat = 100.0,
+                heatPerDegreeC = 1.0,
+                minHeat = 20.0,
+                maxHeat = 400.0,
+            ),
+        )
+    }
+
+    @Test
     fun `mapping is invertible inside the configured range`() {
         val temperature = PowerGridHeatMappingMath.heatToTemperature(
             heat = 250f,

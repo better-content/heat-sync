@@ -1,12 +1,13 @@
 # Heat Sync
 
-HeatSync is a Minecraft `1.20.1` Forge mod built with Kotlin. It exposes Create: New Age heat pipes to Cold Sweat as ambient block temperature sources, so cold pipe networks can affect nearby entities.
+HeatSync is a Minecraft `1.20.1` Forge mod built with Kotlin. It exposes tagged HeatSync thermal storages to Cold Sweat as ambient block temperature sources, so hot and cold networks can affect nearby entities.
 
 ## Behavior
 
 - Registers a Cold Sweat `BlockTemp` handler when Cold Sweat is installed.
 - Maps pipe heat values onto Cold Sweat world temperature with a configurable offset/scale model.
 - Rebalances loaded heat pipes every second using Cold Sweat ambient temperature, neighboring pipe heat, and nearby tagged cold sources.
+- Uses the configured neutral heat baseline as ambient when Cold Sweat is absent; native heat transport remains available.
 - Ships default tags under `data/heat_sync/tags/blocks` for radiator and cold-source classification.
 
 ## Configuration
@@ -42,7 +43,7 @@ Required at runtime:
 
 Optional integrations:
 
-- Cold Sweat `2.3.13` (enables ambient/world temperature bridge)
+- Cold Sweat `2.3.13+` (enables ambient/world temperature bridge; verification is pinned to the pack's `2.4` runtime)
 - EMI `1.1.3+1.20.1+forge` (client-side compatibility)
 
 ## Release
@@ -62,7 +63,7 @@ Coverage outputs:
 
 ## Notes
 
-- Cold Sweat is optional. Without it, HeatSync loads but does not register the bridge hooks.
+- Cold Sweat is optional. `verifyFull` runs the headless GameTests once with Cold Sweat `2.4` and once without Cold Sweat.
 - Development dependencies are resolved from Forge, Create, Modrinth, Curse Maven, and Kotlin for Forge repositories declared in `build.gradle.kts`.
 
 ## Community and support

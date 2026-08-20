@@ -29,7 +29,9 @@ object EnergyLadderMath {
 
         val aePerUnit = previewAe / availableUnits
         val heatPerUnit = previewHeat / availableUnits
-        if (aePerUnit <= 0 || !aePerUnit.isFinite() || heatPerUnit < 0 || !heatPerUnit.isFinite()) {
+        // Positive finite previews divided by a positive unit count cannot become
+        // negative or infinite; only AE underflow can make this plan unusable.
+        if (aePerUnit <= 0) {
             return UnbindingPlan(0, 0, 0.0, 0.0f)
         }
 

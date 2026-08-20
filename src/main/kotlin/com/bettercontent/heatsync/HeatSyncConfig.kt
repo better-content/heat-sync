@@ -174,7 +174,7 @@ object HeatSyncConfig {
 
     fun pipeMinHeat(): Double = pipeMinHeatValue.get()
 
-    fun pipeMaxHeat(): Double = pipeMaxHeatValue.get()
+    fun pipeMaxHeat(): Double = maxOf(pipeMaxHeatValue.get(), pipeMinHeat())
 
     fun ambientBlendRate(): Double = ambientBlendRateValue.get()
 

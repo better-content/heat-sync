@@ -1,5 +1,6 @@
 package com.bettercontent.heatsync.content.heat
 
+import com.bettercontent.heatsync.HeatSyncConfig
 import com.bettercontent.heatsync.HeatSyncRegistries
 import com.bettercontent.heatsync.api.HeatBlockEntity
 import com.bettercontent.heatsync.api.HeatCapabilities
@@ -22,12 +23,12 @@ class HeatPipeBlockEntity(
     pos: BlockPos,
     state: BlockState,
 ) : BlockEntity(HeatSyncRegistries.HEAT_PIPE_BLOCK_ENTITY.get(), pos, state), HeatBlockEntity, IHaveGoggleInformation {
-    private var heat: Float = 100f
+    private var heat: Float = neutralHeat()
     private var heatCapability: LazyOptional<IHeatStorage> = LazyOptional.of { this }
 
     override fun load(tag: CompoundTag) {
         super.load(tag)
-        heat = tag.getFloat(HEAT_KEY).coerceAtLeast(ABSOLUTE_ZERO)
+        heat = if (tag.contains(HEAT_KEY)) boundedHeat(tag.getFloat(HEAT_KEY)) else neutralHeat()
     }
 
     override fun saveAdditional(tag: CompoundTag) {
@@ -58,16 +59,25 @@ class HeatPipeBlockEntity(
     override fun getHeat(): Float = heat
 
     override fun addHeat(heat: Float) {
-        this.heat = (this.heat + heat).coerceIn(ABSOLUTE_ZERO, maxHeat())
+        this.heat = boundedHeat(this.heat + heat)
         setChanged()
     }
 
     override fun setHeat(heat: Float) {
-        this.heat = heat.coerceIn(ABSOLUTE_ZERO, maxHeat())
+        this.heat = boundedHeat(heat)
         setChanged()
     }
 
-    override fun maxHeat(): Float = MAX_HEAT
+    override fun extractHeat(amount: Float, simulate: Boolean): Float {
+        if (amount <= 0f) return 0f
+        val extracted = minOf(amount, (heat - minHeat()).coerceAtLeast(0f))
+        if (!simulate && extracted > 0f) {
+            setHeat(heat - extracted)
+        }
+        return extracted
+    }
+
+    override fun maxHeat(): Float = HeatSyncConfig.pipeMaxHeat().toFloat()
 
     override fun addToGoggleTooltip(tooltip: MutableList<Component>, isPlayerSneaking: Boolean): Boolean {
         HeatBlockEntity.addToolTips(this, tooltip)
@@ -80,9 +90,16 @@ class HeatPipeBlockEntity(
         }
     }
 
+    private fun minHeat(): Float = HeatSyncConfig.pipeMinHeat().toFloat()
+
+    private fun boundedHeat(value: Float): Float {
+        val finiteValue = value.takeIf(Float::isFinite) ?: HeatSyncConfig.absoluteZeroOffset().toFloat()
+        return finiteValue.coerceIn(minHeat(), maxHeat())
+    }
+
+    private fun neutralHeat(): Float = boundedHeat(HeatSyncConfig.absoluteZeroOffset().toFloat())
+
     companion object {
-        private const val ABSOLUTE_ZERO = 0f
-        private const val MAX_HEAT = 400f
         private const val TRANSFER_INTERVAL = 4L
         private const val HEAT_KEY = "Heat"
 

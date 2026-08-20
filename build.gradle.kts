@@ -28,6 +28,13 @@ val chemlibVersion = property("chemlib_version") as String
 val chemlibCurseFileId = property("chemlib_curse_file_id") as String
 val coldSweatVersion = property("cold_sweat_version") as String
 val coldSweatModrinthVersionId = property("cold_sweat_modrinth_version_id") as String
+val coldSweatRuntimeVersion = property("cold_sweat_runtime_version") as String
+val coldSweatRuntimeCurseFileId = property("cold_sweat_runtime_curse_file_id") as String
+val fiahiVersion = property("fiahi_version") as String
+val fiahiCurseFileId = property("fiahi_curse_file_id") as String
+val includeColdSweatRuntime = providers.gradleProperty("include_cold_sweat_runtime")
+    .map { it.toBoolean() }
+    .orElse(true)
 val emiVersion = property("emi_version") as String
 val emiCurseFileId = property("emi_curse_file_id") as String
 val powerGridVersion = property("powergrid_version") as String
@@ -250,7 +257,11 @@ dependencies {
 
     implementation(deobf("curse.maven:chemlib-340666:$chemlibCurseFileId"))
     compileOnly(deobf("maven.modrinth:cold-sweat:$coldSweatModrinthVersionId"))
-    runtimeOnly(deobf("maven.modrinth:cold-sweat:$coldSweatModrinthVersionId"))
+    compileOnly(deobf("curse.maven:freeze-it-and-heat-it-911258:$fiahiCurseFileId"))
+    if (includeColdSweatRuntime.get()) {
+        runtimeOnly(deobf("curse.maven:cold-sweat-506194:$coldSweatRuntimeCurseFileId"))
+        runtimeOnly(deobf("curse.maven:freeze-it-and-heat-it-911258:$fiahiCurseFileId"))
+    }
     compileOnly(deobf("curse.maven:emi-580555:$emiCurseFileId"))
     runtimeOnly(deobf("curse.maven:emi-580555:$emiCurseFileId"))
     compileOnly(deobf("maven.modrinth:power-grid:$powerGridVersion"))
@@ -269,6 +280,7 @@ tasks.processResources {
         "createReleaseVersion" to createReleaseVersion,
         "chemlibVersion" to chemlibVersion,
         "coldSweatVersion" to coldSweatVersion,
+        "fiahiVersion" to fiahiVersion,
         "emiVersion" to emiVersion,
         "powerGridVersion" to powerGridVersion,
         "modId" to modId,
@@ -333,8 +345,24 @@ tasks.withType<Test>().configureEach {
 
 tasks.register("headlessGameTest") {
     group = "verification"
-    description = "Runs Forge game tests in a headless dedicated server."
+    description = "Runs Forge game tests with Cold Sweat $coldSweatRuntimeVersion in a headless dedicated server."
     dependsOn(tasks.named("runGameTestServer"))
+}
+
+val headlessGameTestNoColdSweat by tasks.registering(Exec::class) {
+    group = "verification"
+    description = "Runs Forge game tests without the optional Cold Sweat runtime."
+    workingDir(project.projectDir)
+    commandLine(
+        project.layout.projectDirectory.file("gradlew").asFile.absolutePath,
+        "runGameTestServer",
+        "-Pinclude_cold_sweat_runtime=false",
+        "--no-daemon",
+    )
+}
+
+headlessGameTestNoColdSweat.configure {
+    mustRunAfter(tasks.named("headlessGameTest"))
 }
 
 jacoco {
@@ -342,8 +370,13 @@ jacoco {
 }
 
 val coverageClassPatterns = listOf(
-    "com/bettercontent/heatsync/HeatMappingMath*",
-    "com/bettercontent/heatsync/PipeThermalStepMath*"
+    "com/bettercontent/heatsync/HeatMappingMath.class",
+    "com/bettercontent/heatsync/PipeThermalStepMath.class",
+    "com/bettercontent/heatsync/compat/latent/RadiogenicHeatDistribution.class",
+    "com/bettercontent/heatsync/compat/powergrid/PowerGridHeatMappingMath.class",
+    "com/bettercontent/heatsync/content/coolant/CoolantExchangeLogic.class",
+    "com/bettercontent/heatsync/content/energy/EnergyLadderMath.class",
+    "com/bettercontent/heatsync/content/heat/BoilerHeaterLogic.class"
 )
 
 tasks.jacocoTestReport {
@@ -368,12 +401,22 @@ tasks.jacocoTestCoverageVerification {
             element = "CLASS"
             includes = listOf(
                 "com.bettercontent.heatsync.HeatMappingMath",
-                "com.bettercontent.heatsync.PipeThermalStepMath"
+                "com.bettercontent.heatsync.PipeThermalStepMath",
+                "com.bettercontent.heatsync.compat.latent.RadiogenicHeatDistribution",
+                "com.bettercontent.heatsync.compat.powergrid.PowerGridHeatMappingMath",
+                "com.bettercontent.heatsync.content.coolant.CoolantExchangeLogic",
+                "com.bettercontent.heatsync.content.energy.EnergyLadderMath",
+                "com.bettercontent.heatsync.content.heat.BoilerHeaterLogic"
             )
             limit {
                 counter = "LINE"
                 value = "COVEREDRATIO"
                 minimum = "0.95".toBigDecimal()
+            }
+            limit {
+                counter = "BRANCH"
+                value = "COVEREDRATIO"
+                minimum = "0.90".toBigDecimal()
             }
         }
     }
@@ -391,7 +434,8 @@ tasks.register("verifyFast") {
 
 tasks.register("verifyFull") {
     group = "verification"
-    description = "Runs the full verification lane, including headless Forge GameTests."
+    description = "Runs fast checks and Forge GameTests with and without Cold Sweat."
     dependsOn(tasks.named("verifyFast"))
     dependsOn(tasks.named("headlessGameTest"))
+    dependsOn(headlessGameTestNoColdSweat)
 }

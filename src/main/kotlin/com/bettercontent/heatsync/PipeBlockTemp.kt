@@ -42,10 +42,10 @@ class PipeBlockTemp : BlockTemp(
     }
 
     override fun hasBlock(block: Block): Boolean =
-        block is HeatPipeBlock || block.defaultBlockState().`is`(HeatSyncColdSweatBridge.PIPE_RADIATORS)
+        block is HeatPipeBlock || block.defaultBlockState().`is`(HeatSyncThermalTags.THERMAL_EMITTERS)
 
     override fun isValid(level: Level, pos: BlockPos, state: BlockState): Boolean =
-        (state.block is HeatPipeBlock || state.`is`(HeatSyncColdSweatBridge.PIPE_RADIATORS))
+        (state.block is HeatPipeBlock || state.`is`(HeatSyncThermalTags.THERMAL_EMITTERS))
             && (level.getBlockEntity(pos)?.getCapability(HeatCapabilities.HEAT)?.isPresent == true ||
             level.getBlockEntity(pos) is PipeHeatProvider)
 }
