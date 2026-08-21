@@ -1,6 +1,11 @@
 package com.bettercontent.heatsync.food
 
 import com.bettercontent.heatsync.HeatSyncMod
+import com.bettercontent.heatsync.api.ThermalCapabilities
+import com.bettercontent.heatsync.api.HeatBlockEntity
+import com.bettercontent.heatsync.api.HeatStorageThermalBody
+import net.minecraft.core.BlockPos
+import net.minecraft.core.Direction
 import com.momosoftworks.coldsweat.api.util.Temperature
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.network.chat.Component
@@ -9,7 +14,9 @@ import net.minecraft.util.Mth
 import net.minecraft.world.effect.MobEffectInstance
 import net.minecraft.world.entity.item.ItemEntity
 import net.minecraft.world.entity.player.Player
+import net.minecraft.world.Container
 import net.minecraft.world.item.ItemStack
+import net.minecraft.world.level.Level
 import net.minecraftforge.event.TickEvent
 import net.minecraftforge.event.entity.living.LivingEntityUseItemEvent
 import net.minecraftforge.event.entity.player.ItemTooltipEvent
@@ -75,10 +82,13 @@ object FoodThermalService {
 
     fun temperatureK(stack: ItemStack): Double = stack.tag?.getCompound(KEY)?.getDouble(TEMPERATURE) ?: 295.15
 
+    fun isFrozen(stack: ItemStack): Boolean =
+        profile(stack).freezingC?.let { temperatureK(stack) - 273.15 <= it } == true
+
     /** Item-model tint: cold is ice-white; spoilage deepens from faded brown to near-black. */
     fun itemTint(stack: ItemStack): Int {
         if (!stack.isEdible) return 0xFFFFFF
-        val frozen = profile(stack).freezingC?.let { temperatureK(stack) - 273.15 <= it } == true
+        val frozen = isFrozen(stack)
         if (frozen) return 0xEAF8FF
         return when (stage(stack)) {
             Stage.FRESH -> 0xFFFFFF
@@ -115,6 +125,28 @@ object FoodThermalService {
         return stack
     }
 
+    /** Updates a real block inventory from immediately adjacent Heat Sync thermal sources. */
+    fun tickContainer(level: Level, pos: BlockPos, container: Container, gameTime: Long) {
+        val target = adjacentThermalTarget(level, pos) ?: 295.15
+        for (slot in 0 until container.containerSize) {
+            val stack = container.getItem(slot)
+            if (stack.isEdible) container.setItem(slot, tick(stack, target, gameTime, appliance = true))
+        }
+    }
+
+    fun adjacentThermalTarget(level: Level, pos: BlockPos): Double? {
+        val temperatures = Direction.values().mapNotNull { direction ->
+            val source = level.getBlockEntity(pos.relative(direction)) ?: return@mapNotNull null
+            source.getCapability(ThermalCapabilities.BODY, direction.opposite)
+                .resolve()
+                .orElseGet {
+                    (source as? HeatBlockEntity)?.let(::HeatStorageThermalBody)
+                }
+                ?.temperatureKelvin()
+        }
+        return temperatures.takeIf { it.isNotEmpty() }?.average()
+    }
+
     private fun ambient(player: Player): Double {
         val mc = runCatching { Temperature.get(player, Temperature.Trait.WORLD) }.getOrDefault(0.88)
         return mc * 25.0 + 273.15
@@ -135,8 +167,7 @@ object FoodThermalService {
     fun onUseStart(event: LivingEntityUseItemEvent.Start) {
         val stack = event.item
         if (!stack.isEdible) return
-        val freeze = profile(stack).freezingC ?: return
-        if (temperatureK(stack) - 273.15 <= freeze) event.isCanceled = true
+        if (isFrozen(stack)) event.isCanceled = true
     }
 
     @SubscribeEvent
@@ -160,7 +191,7 @@ object FoodThermalService {
         if (!stack.isEdible || !stack.tag?.contains(KEY).orFalse()) return
         val p = profile(stack)
         val c = temperatureK(stack) - 273.15
-        val frozen = p.freezingC?.let { c <= it } == true
+        val frozen = isFrozen(stack)
         event.toolTip.add(Component.literal("${"%.1f".format(c)} °C — ${stage(stack).name.lowercase()}"))
         if (frozen) event.toolTip.add(Component.translatable("tooltip.heat_sync.food_frozen"))
         if (p.days == null) event.toolTip.add(Component.translatable("tooltip.heat_sync.food_shelf_stable"))

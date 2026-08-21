@@ -4,7 +4,7 @@ import net.minecraft.core.Direction
 
 /** Transitional adapter for pre-Kelvin Heat Sync blocks during the one-release data reset. */
 class HeatStorageThermalBody(private val storage: IHeatStorage) : IThermalBody {
-    override fun temperatureKelvin(): Double = 295.15 + (storage.getHeat() - 100.0) / 0.25
+    override fun temperatureKelvin(): Double = (295.15 + (storage.getHeat() - 100.0) / 0.25).coerceIn(0.0, 1495.15)
     override fun minTemperatureKelvin(): Double = 0.0
     override fun maxTemperatureKelvin(): Double = 1495.15
     override fun heatCapacityHUPerK(): Double = 0.25
