@@ -2,7 +2,6 @@ package com.bettercontent.heatsync.food
 
 import com.bettercontent.heatsync.HeatSyncMod
 import com.momosoftworks.coldsweat.api.util.Temperature
-import net.minecraft.ChatFormatting
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.network.chat.Component
 import net.minecraft.server.level.ServerPlayer
@@ -75,6 +74,19 @@ object FoodThermalService {
     }
 
     fun temperatureK(stack: ItemStack): Double = stack.tag?.getCompound(KEY)?.getDouble(TEMPERATURE) ?: 295.15
+
+    /** Item-model tint: cold is ice-white; spoilage deepens from faded brown to near-black. */
+    fun itemTint(stack: ItemStack): Int {
+        if (!stack.isEdible) return 0xFFFFFF
+        val frozen = profile(stack).freezingC?.let { temperatureK(stack) - 273.15 <= it } == true
+        if (frozen) return 0xEAF8FF
+        return when (stage(stack)) {
+            Stage.FRESH -> 0xFFFFFF
+            Stage.STALE -> 0xD9C9AA
+            Stage.SPOILED -> 0x916D43
+            Stage.ROTTEN, Stage.CONVERTED -> 0x392416
+        }
+    }
 
     fun tick(stack: ItemStack, targetK: Double, gameTime: Long, appliance: Boolean = false): ItemStack {
         if (!stack.isEdible || stack.item == FoodItems.SPOILED_MEAT.get() || stack.item == FoodItems.SPOILED_PRODUCE.get()) return stack
@@ -149,9 +161,9 @@ object FoodThermalService {
         val p = profile(stack)
         val c = temperatureK(stack) - 273.15
         val frozen = p.freezingC?.let { c <= it } == true
-        event.toolTip.add(Component.literal("${"%.1f".format(c)} °C — ${stage(stack).name.lowercase()}").withStyle(if (frozen) ChatFormatting.AQUA else ChatFormatting.GRAY))
-        if (frozen) event.toolTip.add(Component.translatable("tooltip.heat_sync.food_frozen").withStyle(ChatFormatting.AQUA))
-        if (p.days == null) event.toolTip.add(Component.translatable("tooltip.heat_sync.food_shelf_stable").withStyle(ChatFormatting.DARK_GREEN))
+        event.toolTip.add(Component.literal("${"%.1f".format(c)} °C — ${stage(stack).name.lowercase()}"))
+        if (frozen) event.toolTip.add(Component.translatable("tooltip.heat_sync.food_frozen"))
+        if (p.days == null) event.toolTip.add(Component.translatable("tooltip.heat_sync.food_shelf_stable"))
     }
 
     private fun Boolean?.orFalse() = this == true
