@@ -103,6 +103,14 @@ class FoodThermalGameTests {
         }
     }
 
+    @GameTest(template = "coolant_exchanger", timeoutTicks = 20)
+    fun staleFoodDebuffsLastTenSeconds(helper: GameTestHelper) {
+        helper.succeedIf {
+            helper.assertTrue(FoodThermalService.debuffDurationTicks(FoodThermalService.Stage.STALE) == 200, "Stale-food debuffs must last 10 seconds")
+            helper.assertTrue(FoodThermalService.debuffDurationTicks(FoodThermalService.Stage.SPOILED) == 1200, "More severe food stages retain their one-minute duration")
+        }
+    }
+
     private fun thermalState(stack: ItemStack, temperature: Double, target: Double) {
         val state = stack.orCreateTag.getCompound("heat_sync_food")
         state.putInt("version", 1)

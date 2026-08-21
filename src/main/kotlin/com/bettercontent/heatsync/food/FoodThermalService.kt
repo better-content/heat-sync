@@ -318,14 +318,17 @@ object FoodThermalService {
         val current = event.item
         val stage = if (current.item == FoodItems.SPOILED_MEAT.get() || current.item == FoodItems.SPOILED_PRODUCE.get()) Stage.ROTTEN else stage(current)
         val amplifier = when (stage) { Stage.STALE -> 0; Stage.SPOILED -> 1; Stage.ROTTEN, Stage.CONVERTED -> 2; else -> return }
-        player.addEffect(MobEffectInstance(net.minecraft.world.effect.MobEffects.HUNGER, 1200, amplifier))
-        player.addEffect(MobEffectInstance(FoodEffects.THIRST.get(), 1200, amplifier))
-        player.addEffect(MobEffectInstance(FoodEffects.MALNOURISHMENT.get(), 1200, amplifier))
+        val duration = debuffDurationTicks(stage)
+        player.addEffect(MobEffectInstance(net.minecraft.world.effect.MobEffects.HUNGER, duration, amplifier))
+        player.addEffect(MobEffectInstance(FoodEffects.THIRST.get(), duration, amplifier))
+        player.addEffect(MobEffectInstance(FoodEffects.MALNOURISHMENT.get(), duration, amplifier))
         if (amplifier == 2) {
             player.addEffect(MobEffectInstance(net.minecraft.world.effect.MobEffects.POISON, 200, 0))
             player.addEffect(MobEffectInstance(net.minecraft.world.effect.MobEffects.MOVEMENT_SLOWDOWN, 400, 0))
         }
     }
+
+    fun debuffDurationTicks(stage: Stage): Int = if (stage == Stage.STALE) 200 else 1200
 
     @SubscribeEvent
     fun onTooltip(event: ItemTooltipEvent) {
