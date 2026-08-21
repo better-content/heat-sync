@@ -4,8 +4,8 @@ import com.bettercontent.heatsync.command.HeatSyncCommands
 import com.bettercontent.heatsync.compat.powergrid.PowerGridHeatBridge
 import com.bettercontent.heatsync.compat.pneumaticcraft.PneumaticHeatBridge
 import com.bettercontent.heatsync.compat.create.CreateBoilerHeaterBridge
-import com.bettercontent.heatsync.compat.fiahi.FiahiHeatBridge
-import com.bettercontent.heatsync.compat.latent.LatentRadiogenicHeatBridge
+import com.bettercontent.heatsync.food.FoodThermalService
+import com.bettercontent.heatsync.api.ThermalCapabilityBridge
 import com.bettercontent.heatsync.content.coolant.LiquidCoolantManager
 import com.mojang.logging.LogUtils
 import net.minecraftforge.event.AddReloadListenerEvent
@@ -36,12 +36,10 @@ class HeatSyncMod(modLoadingContext: FMLJavaModLoadingContext) {
         MinecraftForge.EVENT_BUS.addListener(::onAddReloadListeners)
         MinecraftForge.EVENT_BUS.addListener(::onRegisterCommands)
         MinecraftForge.EVENT_BUS.register(HeatSyncPipeThermalController)
+        ThermalCapabilityBridge.initialize(MinecraftForge.EVENT_BUS)
 
         if (ModList.get().isLoaded(COLD_SWEAT_MOD_ID)) {
             HeatSyncColdSweatBridge.initialize(MinecraftForge.EVENT_BUS)
-        }
-        if (ModList.get().isLoaded(FiahiHeatBridge.MOD_ID)) {
-            FiahiHeatBridge.initialize(MinecraftForge.EVENT_BUS)
         }
         if (ModList.get().isLoaded(PowerGridHeatBridge.MOD_ID)) {
             PowerGridHeatBridge.initialize(MinecraftForge.EVENT_BUS)
@@ -49,9 +47,7 @@ class HeatSyncMod(modLoadingContext: FMLJavaModLoadingContext) {
         if (ModList.get().isLoaded(PneumaticHeatBridge.MOD_ID)) {
             PneumaticHeatBridge.initialize(MinecraftForge.EVENT_BUS)
         }
-        if (ModList.get().isLoaded(LatentRadiogenicHeatBridge.MOD_ID)) {
-            LatentRadiogenicHeatBridge.initialize(MinecraftForge.EVENT_BUS)
-        }
+        MinecraftForge.EVENT_BUS.register(FoodThermalService)
 
         LOGGER.info("Loaded mod {}", MOD_ID)
     }

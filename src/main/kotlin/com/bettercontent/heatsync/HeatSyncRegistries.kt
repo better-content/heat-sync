@@ -12,6 +12,8 @@ import com.bettercontent.heatsync.content.heat.HeatPipeBlock
 import com.bettercontent.heatsync.content.heat.HeatPipeBlockEntity
 import com.bettercontent.heatsync.content.heat.ThermalFireboxBlock
 import com.bettercontent.heatsync.content.heat.ThermalFireboxBlockEntity
+import com.bettercontent.heatsync.food.FoodEffects
+import com.bettercontent.heatsync.food.FoodItems
 import com.mojang.datafixers.DSL
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.world.item.BlockItem
@@ -119,6 +121,8 @@ object HeatSyncRegistries {
         FLUIDS.register(modBus)
         FLUID_TYPES.register(modBus)
         BLOCK_ENTITY_TYPES.register(modBus)
+        FoodItems.ITEMS.register(modBus)
+        FoodEffects.EFFECTS.register(modBus)
     }
 
     fun hotFluid(hotFluidId: ResourceLocation): ForgeFlowingFluid.Source = hotFluidRegistration(hotFluidId).source.get()

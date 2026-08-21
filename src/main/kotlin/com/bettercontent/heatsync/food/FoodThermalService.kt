@@ -1,0 +1,158 @@
+package com.bettercontent.heatsync.food
+
+import com.bettercontent.heatsync.HeatSyncMod
+import com.momosoftworks.coldsweat.api.util.Temperature
+import net.minecraft.ChatFormatting
+import net.minecraft.nbt.CompoundTag
+import net.minecraft.network.chat.Component
+import net.minecraft.server.level.ServerPlayer
+import net.minecraft.util.Mth
+import net.minecraft.world.effect.MobEffectInstance
+import net.minecraft.world.entity.item.ItemEntity
+import net.minecraft.world.entity.player.Player
+import net.minecraft.world.item.ItemStack
+import net.minecraftforge.event.TickEvent
+import net.minecraftforge.event.entity.living.LivingEntityUseItemEvent
+import net.minecraftforge.event.entity.player.ItemTooltipEvent
+import net.minecraftforge.eventbus.api.SubscribeEvent
+import net.minecraftforge.fml.ModList
+import kotlin.math.exp
+import kotlin.math.pow
+
+/** Replaces FIAHI's coupled temperature/rot scalar with independent physical temperature and decay. */
+object FoodThermalService {
+    private const val KEY = "heat_sync_food"
+    private const val TEMPERATURE = "temperature_k"
+    private const val DECAY = "decay"
+    private const val LAST_TIME = "last_time"
+    private const val LAST_TARGET = "last_target_k"
+    private const val CHANGED = "thermally_changed"
+    private const val VERSION = "version"
+    private const val TICK_INTERVAL = 120L
+    private const val WORLD_TAU_TICKS = 1000.0 // 95% in five minutes
+
+    enum class Stage { FRESH, STALE, SPOILED, ROTTEN, CONVERTED }
+    data class Profile(val id: String, val days: Double?, val freezingC: Double?, val meat: Boolean)
+
+    fun profile(stack: ItemStack): Profile {
+        val id = stack.item.descriptionId.lowercase()
+        val meat = stack.item.foodProperties?.isMeat == true
+        return when {
+            id.contains("vodka") || id.contains("rum") -> Profile("distilled_alcohol", null, -25.0, false)
+            id.contains("beer") || id.contains("wine") || id.contains("mead") -> Profile("fermented_alcohol", null, -5.0, false)
+            id.contains("grog") || id.contains("nog") || id.contains("cocktail") -> Profile("alcoholic_cocktail", 28.0, -5.0, false)
+            id.contains("dried") -> Profile("dried", null, null, meat)
+            id.contains("canned") || id.contains("golden_") -> Profile("shelf_stable", null, 0.0, meat)
+            id.contains("jerky") || id.contains("pickle") || id.contains("kimchi") || id.contains("jam") || id.contains("marmalade") || id.contains("smoked") || id.contains("cheese") -> Profile("preserved", 28.0, 0.0, meat)
+            meat || id.contains("raw_") -> Profile("raw_animal", 3.0, 0.0, meat)
+            id.contains("apple") || id.contains("berry") || id.contains("carrot") || id.contains("potato") || id.contains("melon") || id.contains("vegetable") -> Profile("fresh_produce", 5.0, 0.0, false)
+            else -> Profile("prepared", 7.0, 0.0, meat)
+        }
+    }
+
+    fun state(stack: ItemStack, targetK: Double, gameTime: Long): CompoundTag {
+        val root = stack.orCreateTag
+        val existing = root.getCompound(KEY)
+        if (existing.contains(VERSION)) return existing
+        existing.putInt(VERSION, 1)
+        existing.putDouble(TEMPERATURE, targetK)
+        existing.putDouble(DECAY, 0.0)
+        existing.putLong(LAST_TIME, gameTime)
+        existing.putDouble(LAST_TARGET, targetK)
+        root.put(KEY, existing)
+        return existing
+    }
+
+    fun stage(stack: ItemStack): Stage {
+        val value = stack.tag?.getCompound(KEY)?.getDouble(DECAY) ?: 0.0
+        return when {
+            value >= 1.0 -> Stage.CONVERTED
+            value >= 5.0 / 7.0 -> Stage.ROTTEN
+            value >= 3.0 / 7.0 -> Stage.SPOILED
+            value >= 1.0 / 7.0 -> Stage.STALE
+            else -> Stage.FRESH
+        }
+    }
+
+    fun temperatureK(stack: ItemStack): Double = stack.tag?.getCompound(KEY)?.getDouble(TEMPERATURE) ?: 295.15
+
+    fun tick(stack: ItemStack, targetK: Double, gameTime: Long, appliance: Boolean = false): ItemStack {
+        if (!stack.isEdible || stack.item == FoodItems.SPOILED_MEAT.get() || stack.item == FoodItems.SPOILED_PRODUCE.get()) return stack
+        val profile = profile(stack)
+        val tag = state(stack, targetK, gameTime)
+        val elapsed = (gameTime - tag.getLong(LAST_TIME)).coerceAtLeast(0L)
+        if (elapsed == 0L) return stack
+        val old = tag.getDouble(TEMPERATURE)
+        val oldTarget = tag.getDouble(LAST_TARGET)
+        val tau = if (appliance) 200.0 else WORLD_TAU_TICKS
+        val next = oldTarget + (old - oldTarget) * exp(-elapsed / tau)
+        tag.putDouble(TEMPERATURE, next)
+        if (kotlin.math.abs(next - old) >= 5.0) tag.putBoolean(CHANGED, true)
+        profile.days?.let { days ->
+            val celsius = next - 273.15
+            val freezing = profile.freezingC ?: Double.NEGATIVE_INFINITY
+            if (celsius > freezing) {
+                val rate = 2.0.pow((celsius - 22.0) / 10.0)
+                val added = elapsed / (days * 24000.0) * rate
+                tag.putDouble(DECAY, (tag.getDouble(DECAY) + added).coerceAtMost(1.0))
+            }
+        }
+        tag.putLong(LAST_TIME, gameTime)
+        tag.putDouble(LAST_TARGET, targetK)
+        if (stage(stack) == Stage.CONVERTED) return ItemStack(if (profile.meat) FoodItems.SPOILED_MEAT.get() else FoodItems.SPOILED_PRODUCE.get(), stack.count)
+        return stack
+    }
+
+    private fun ambient(player: Player): Double {
+        val mc = runCatching { Temperature.get(player, Temperature.Trait.WORLD) }.getOrDefault(0.88)
+        return mc * 25.0 + 273.15
+    }
+
+    @SubscribeEvent
+    fun onPlayerTick(event: TickEvent.PlayerTickEvent) {
+        val player = event.player
+        if (event.phase != TickEvent.Phase.END || player.level().isClientSide || player.tickCount.toLong() % TICK_INTERVAL != 0L) return
+        val target = ambient(player)
+        player.inventory.items.indices.forEach { slot ->
+            val stack = player.inventory.items[slot]
+            if (stack.isEdible) player.inventory.items[slot] = tick(stack, target, player.level().gameTime)
+        }
+    }
+
+    @SubscribeEvent
+    fun onUseStart(event: LivingEntityUseItemEvent.Start) {
+        val stack = event.item
+        if (!stack.isEdible) return
+        val freeze = profile(stack).freezingC ?: return
+        if (temperatureK(stack) - 273.15 <= freeze) event.isCanceled = true
+    }
+
+    @SubscribeEvent
+    fun onUseFinish(event: LivingEntityUseItemEvent.Finish) {
+        val player = event.entity as? ServerPlayer ?: return
+        val current = event.item
+        val stage = if (current.item == FoodItems.SPOILED_MEAT.get() || current.item == FoodItems.SPOILED_PRODUCE.get()) Stage.ROTTEN else stage(current)
+        val amplifier = when (stage) { Stage.STALE -> 0; Stage.SPOILED -> 1; Stage.ROTTEN, Stage.CONVERTED -> 2; else -> return }
+        player.addEffect(MobEffectInstance(net.minecraft.world.effect.MobEffects.HUNGER, 1200, amplifier))
+        player.addEffect(MobEffectInstance(FoodEffects.THIRST.get(), 1200, amplifier))
+        player.addEffect(MobEffectInstance(FoodEffects.MALNOURISHMENT.get(), 1200, amplifier))
+        if (amplifier == 2) {
+            player.addEffect(MobEffectInstance(net.minecraft.world.effect.MobEffects.POISON, 200, 0))
+            player.addEffect(MobEffectInstance(net.minecraft.world.effect.MobEffects.MOVEMENT_SLOWDOWN, 400, 0))
+        }
+    }
+
+    @SubscribeEvent
+    fun onTooltip(event: ItemTooltipEvent) {
+        val stack = event.itemStack
+        if (!stack.isEdible || !stack.tag?.contains(KEY).orFalse()) return
+        val p = profile(stack)
+        val c = temperatureK(stack) - 273.15
+        val frozen = p.freezingC?.let { c <= it } == true
+        event.toolTip.add(Component.literal("${"%.1f".format(c)} °C — ${stage(stack).name.lowercase()}").withStyle(if (frozen) ChatFormatting.AQUA else ChatFormatting.GRAY))
+        if (frozen) event.toolTip.add(Component.translatable("tooltip.heat_sync.food_frozen").withStyle(ChatFormatting.AQUA))
+        if (p.days == null) event.toolTip.add(Component.translatable("tooltip.heat_sync.food_shelf_stable").withStyle(ChatFormatting.DARK_GREEN))
+    }
+
+    private fun Boolean?.orFalse() = this == true
+}

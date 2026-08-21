@@ -1,9 +1,8 @@
 package com.bettercontent.heatsync.compat.pneumaticcraft
 
-import com.bettercontent.heatsync.HeatSyncConfig
 import com.bettercontent.heatsync.HeatSyncMod
-import com.bettercontent.heatsync.api.HeatCapabilities
-import com.bettercontent.heatsync.api.IHeatStorage
+import com.bettercontent.heatsync.api.IThermalBody
+import com.bettercontent.heatsync.api.ThermalCapabilities
 import me.desht.pneumaticcraft.api.PNCCapabilities
 import me.desht.pneumaticcraft.api.heat.IHeatExchangerLogic
 import net.minecraft.core.BlockPos
@@ -30,7 +29,7 @@ object PneumaticHeatBridge {
     }
 
     private fun attachCapabilities(event: AttachCapabilitiesEvent<BlockEntity>) {
-        val heat = event.`object`.getCapability(HeatCapabilities.HEAT)
+        val heat = event.`object`.getCapability(ThermalCapabilities.BODY)
         if (!heat.isPresent) return
         val provider = PneumaticHeatProvider(heat)
         event.addCapability(ID, provider)
@@ -38,10 +37,10 @@ object PneumaticHeatBridge {
     }
 
     private class PneumaticHeatProvider(
-        private val heat: LazyOptional<IHeatStorage>,
+        private val heat: LazyOptional<IThermalBody>,
     ) : ICapabilityProvider {
         private val logic: LazyOptional<IHeatExchangerLogic> = LazyOptional.of {
-            HeatSyncPneumaticLogic { heat.orElseThrow { IllegalStateException("HeatSync capability invalidated") } }
+            HeatSyncPneumaticLogic { heat.orElseThrow { IllegalStateException("HeatSync thermal capability invalidated") } }
         }
 
         override fun <T : Any> getCapability(cap: Capability<T>, side: Direction?): LazyOptional<T> =
@@ -53,7 +52,7 @@ object PneumaticHeatBridge {
     }
 
     private class HeatSyncPneumaticLogic(
-        private val storage: () -> IHeatStorage,
+        private val storage: () -> IThermalBody,
     ) : IHeatExchangerLogic {
         private var thermalResistance = 1.0
         private var thermalCapacity = 1.0
@@ -70,45 +69,37 @@ object PneumaticHeatBridge {
         override fun initializeAmbientTemperature(level: Level, pos: BlockPos) = Unit
 
         override fun setTemperature(temperature: Double) {
-            storage().setHeat(toHeatSync(temperature).toFloat())
+            storage().setTemperatureKelvin(temperature)
         }
 
-        override fun getTemperature(): Double = toPneumatic(storage().getHeat().toDouble())
+        override fun getTemperature(): Double = storage().temperatureKelvin()
 
         override fun getTemperatureAsInt(): Int = temperature.roundToInt()
 
-        override fun getAmbientTemperature(): Double = HeatSyncConfig.pneumaticAmbientTemperature()
+        override fun getAmbientTemperature(): Double = 295.15
 
         override fun setThermalResistance(resistance: Double) {
             thermalResistance = resistance.coerceAtLeast(0.0)
         }
 
         override fun getThermalResistance(): Double =
-            maxOf(thermalResistance, storage().getThermalResistance().toDouble())
+            maxOf(thermalResistance, 1.0 / storage().conductanceHUPerKTick(null).coerceAtLeast(0.0001))
 
         override fun setThermalCapacity(capacity: Double) {
             thermalCapacity = capacity.coerceAtLeast(0.0001)
         }
 
         override fun getThermalCapacity(): Double =
-            maxOf(thermalCapacity, storage().getThermalCapacity().toDouble())
+            maxOf(thermalCapacity, storage().heatCapacityHUPerK())
 
         override fun addHeat(amount: Double) {
             if (amount > 0) {
-                storage().addHeat((amount * HeatSyncConfig.pneumaticHeatPerKelvin()).toFloat(), false)
+                storage().insertHeatHU(amount)
             } else if (amount < 0) {
-                storage().extractHeat((-amount * HeatSyncConfig.pneumaticHeatPerKelvin()).toFloat(), false)
+                storage().extractHeatHU(-amount)
             }
         }
 
         override fun isSideConnected(side: Direction): Boolean = storage().canConnect(side)
-
-        private fun toHeatSync(pneumaticKelvin: Double): Double =
-            HeatSyncConfig.pneumaticAmbientHeat() +
-                (pneumaticKelvin - HeatSyncConfig.pneumaticAmbientTemperature()) * HeatSyncConfig.pneumaticHeatPerKelvin()
-
-        private fun toPneumatic(heat: Double): Double =
-            HeatSyncConfig.pneumaticAmbientTemperature() +
-                (heat - HeatSyncConfig.pneumaticAmbientHeat()) / HeatSyncConfig.pneumaticHeatPerKelvin()
     }
 }

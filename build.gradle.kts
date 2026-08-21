@@ -31,8 +31,6 @@ val coldSweatVersion = property("cold_sweat_version") as String
 val coldSweatModrinthVersionId = property("cold_sweat_modrinth_version_id") as String
 val coldSweatRuntimeVersion = property("cold_sweat_runtime_version") as String
 val coldSweatRuntimeCurseFileId = property("cold_sweat_runtime_curse_file_id") as String
-val fiahiVersion = property("fiahi_version") as String
-val fiahiCurseFileId = property("fiahi_curse_file_id") as String
 val includeColdSweatRuntime = providers.gradleProperty("include_cold_sweat_runtime")
     .map { it.toBoolean() }
     .orElse(true)
@@ -259,10 +257,8 @@ dependencies {
 
     implementation(deobf("curse.maven:chemlib-340666:$chemlibCurseFileId"))
     compileOnly(deobf("maven.modrinth:cold-sweat:$coldSweatModrinthVersionId"))
-    compileOnly(deobf("curse.maven:freeze-it-and-heat-it-911258:$fiahiCurseFileId"))
     if (includeColdSweatRuntime.get()) {
         runtimeOnly(deobf("curse.maven:cold-sweat-506194:$coldSweatRuntimeCurseFileId"))
-        runtimeOnly(deobf("curse.maven:freeze-it-and-heat-it-911258:$fiahiCurseFileId"))
     }
     compileOnly(deobf("curse.maven:emi-580555:$emiCurseFileId"))
     runtimeOnly(deobf("curse.maven:emi-580555:$emiCurseFileId"))
@@ -282,7 +278,6 @@ tasks.processResources {
         "createReleaseVersion" to createReleaseVersion,
         "chemlibVersion" to chemlibVersion,
         "coldSweatVersion" to coldSweatVersion,
-        "fiahiVersion" to fiahiVersion,
         "emiVersion" to emiVersion,
         "powerGridVersion" to powerGridVersion,
         "modId" to modId,
