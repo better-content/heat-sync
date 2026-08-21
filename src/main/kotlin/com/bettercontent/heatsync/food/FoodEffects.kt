@@ -32,6 +32,8 @@ private class SystemDrainEffect(color: Int, private val diet: Boolean) : MobEffe
 }
 
 private object ThirstBridge {
+    private val pendingLoss = mutableMapOf<java.util.UUID, Double>()
+
     fun drain(player: Player, amplifier: Int) {
         runCatching {
             val caps = Class.forName("dev.ghen.thirst.foundation.common.capability.ModCapabilities")
@@ -40,8 +42,11 @@ private object ThirstBridge {
             lazy.javaClass.getMethod("ifPresent", java.util.function.Consumer::class.java).invoke(lazy, java.util.function.Consumer<Any> { thirst ->
                 val now = thirst.javaClass.getMethod("getThirst").invoke(thirst) as Int
                 val quenched = thirst.javaClass.getMethod("getQuenched").invoke(thirst) as Int
-                val loss = (amplifier + 1) / 60.0
-                val next = (now - loss).toInt().coerceAtLeast(0)
+                val loss = doubleArrayOf(2.0, 4.0, 6.0)[amplifier.coerceIn(0, 2)] / 60.0
+                val accumulated = (pendingLoss[player.uuid] ?: 0.0) + loss
+                val whole = accumulated.toInt()
+                pendingLoss[player.uuid] = accumulated - whole
+                val next = (now - whole).coerceAtLeast(0)
                 thirst.javaClass.getMethod("setThirst", Int::class.javaPrimitiveType).invoke(thirst, next)
                 thirst.javaClass.getMethod("setQuenched", Int::class.javaPrimitiveType).invoke(thirst, quenched.coerceAtMost(next))
                 thirst.javaClass.getMethod("updateThirstData", Player::class.java).invoke(thirst, player)
