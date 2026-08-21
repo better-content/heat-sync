@@ -8,7 +8,9 @@ import net.minecraft.gametest.framework.GameTest
 import net.minecraft.gametest.framework.GameTestHelper
 import net.minecraft.world.item.ItemStack
 import net.minecraft.world.item.Items
+import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.level.block.Blocks
+import net.minecraft.world.level.block.entity.BarrelBlockEntity
 import net.minecraft.world.level.block.entity.ChestBlockEntity
 import net.minecraftforge.gametest.GameTestHolder
 import net.minecraftforge.gametest.PrefixGameTestTemplate
@@ -42,6 +44,24 @@ class FoodThermalGameTests {
 
         helper.succeedIf {
             helper.assertTrue(!FoodThermalService.isFrozen(chest.getItem(0)), "Food in a chest beside a heat source must thaw")
+        }
+    }
+
+    @GameTest(template = "coolant_exchanger", timeoutTicks = 20)
+    fun barrelBesidePackedIceFreezesThroughInventoryScheduler(helper: GameTestHelper) {
+        val barrelPos = BlockPos(2, 1, 2)
+        helper.setBlock(barrelPos, Blocks.BARREL)
+        helper.setBlock(barrelPos.west(), Blocks.PACKED_ICE)
+        val barrel = requireNotNull(helper.getBlockEntity(barrelPos) as? BarrelBlockEntity)
+        barrel.setItem(0, ItemStack(Items.COOKED_BEEF))
+
+        val level = helper.level as ServerLevel
+        FoodThermalService.trackInventory(level, barrel)
+        FoodThermalService.tickTrackedInventories(level, 0)
+        FoodThermalService.tickTrackedInventories(level, 4_000)
+
+        helper.succeedIf {
+            helper.assertTrue(FoodThermalService.isFrozen(barrel.getItem(0)), "Packed ice beside a barrel must freeze food through the normal inventory scheduler")
         }
     }
 

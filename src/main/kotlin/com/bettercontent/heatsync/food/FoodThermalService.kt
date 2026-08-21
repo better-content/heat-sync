@@ -1,11 +1,13 @@
 package com.bettercontent.heatsync.food
 
 import com.bettercontent.heatsync.HeatSyncMod
+import com.bettercontent.heatsync.ColdSweatAmbientSampler
 import com.bettercontent.heatsync.api.ThermalCapabilities
 import com.bettercontent.heatsync.api.HeatBlockEntity
 import com.bettercontent.heatsync.api.HeatStorageThermalBody
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Direction
+import net.minecraft.core.SectionPos
 import com.momosoftworks.coldsweat.api.util.Temperature
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.network.chat.Component
@@ -17,11 +19,22 @@ import net.minecraft.world.entity.player.Player
 import net.minecraft.world.Container
 import net.minecraft.world.item.ItemStack
 import net.minecraft.world.level.Level
+import net.minecraft.world.level.block.Blocks
+import net.minecraft.world.level.block.entity.BlockEntity
+import net.minecraft.world.level.chunk.LevelChunk
+import net.minecraft.resources.ResourceKey
+import net.minecraft.server.level.ServerLevel
+import net.minecraftforge.common.capabilities.ForgeCapabilities
 import net.minecraftforge.event.TickEvent
 import net.minecraftforge.event.entity.living.LivingEntityUseItemEvent
 import net.minecraftforge.event.entity.player.ItemTooltipEvent
+import net.minecraftforge.event.level.BlockEvent
+import net.minecraftforge.event.level.ChunkEvent
+import net.minecraftforge.event.level.LevelEvent
 import net.minecraftforge.eventbus.api.SubscribeEvent
 import net.minecraftforge.fml.ModList
+import net.minecraftforge.items.IItemHandlerModifiable
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet
 import kotlin.math.exp
 import kotlin.math.pow
 
@@ -36,6 +49,9 @@ object FoodThermalService {
     private const val VERSION = "version"
     private const val TICK_INTERVAL = 120L
     private const val WORLD_TAU_TICKS = 1000.0 // 95% in five minutes
+    private val trackedInventoryPositionsByLevel = mutableMapOf<ResourceKey<Level>, LongOpenHashSet>()
+
+    private data class ContainerTarget(val temperatureK: Double, val appliance: Boolean)
 
     enum class Stage { FRESH, STALE, SPOILED, ROTTEN, CONVERTED }
     data class Profile(val id: String, val days: Double?, val freezingC: Double?, val meat: Boolean)
@@ -125,14 +141,23 @@ object FoodThermalService {
         return stack
     }
 
-    /** Updates a real block inventory from immediately adjacent Heat Sync thermal sources. */
+    /** Updates a real block inventory from local Cold Sweat temperature and adjacent thermal blocks. */
     fun tickContainer(level: Level, pos: BlockPos, container: Container, gameTime: Long) {
-        val target = adjacentThermalTarget(level, pos) ?: 295.15
+        val target = containerTarget(level, pos)
         for (slot in 0 until container.containerSize) {
             val stack = container.getItem(slot)
-            if (stack.isEdible) container.setItem(slot, tick(stack, target, gameTime, appliance = true))
+            if (stack.isEdible) container.setItem(slot, tick(stack, target.temperatureK, gameTime, target.appliance))
         }
     }
+
+    /**
+     * A powered Heat Sync body is an appliance setpoint.  Ice is a passive local cold source;
+     * everything else follows Cold Sweat's actual world temperature at this block position.
+     */
+    private fun containerTarget(level: Level, pos: BlockPos): ContainerTarget =
+        adjacentThermalTarget(level, pos)?.let { ContainerTarget(it, appliance = true) }
+            ?: adjacentPassiveColdTarget(level, pos)?.let { ContainerTarget(it, appliance = false) }
+            ?: ContainerTarget(ambient(level, pos), appliance = false)
 
     fun adjacentThermalTarget(level: Level, pos: BlockPos): Double? {
         val temperatures = Direction.values().mapNotNull { direction ->
@@ -147,8 +172,25 @@ object FoodThermalService {
         return temperatures.takeIf { it.isNotEmpty() }?.average()
     }
 
+    private fun adjacentPassiveColdTarget(level: Level, pos: BlockPos): Double? =
+        Direction.values().mapNotNull { direction ->
+            when (level.getBlockState(pos.relative(direction)).block) {
+                Blocks.SNOW_BLOCK -> 268.15
+                Blocks.ICE -> 273.15
+                Blocks.PACKED_ICE -> 263.15
+                Blocks.BLUE_ICE -> 253.15
+                else -> null
+            }
+        }.takeIf { it.isNotEmpty() }?.average()
+
     private fun ambient(player: Player): Double {
         val mc = runCatching { Temperature.get(player, Temperature.Trait.WORLD) }.getOrDefault(0.88)
+        return mc * 25.0 + 273.15
+    }
+
+    private fun ambient(level: Level, pos: BlockPos): Double {
+        if (!ModList.get().isLoaded(HeatSyncMod.COLD_SWEAT_MOD_ID)) return 295.15
+        val mc = runCatching { ColdSweatAmbientSampler.sampleWorldTemp(level, pos) }.getOrDefault(0.88)
         return mc * 25.0 + 273.15
     }
 
@@ -157,11 +199,111 @@ object FoodThermalService {
         val player = event.player
         if (event.phase != TickEvent.Phase.END || player.level().isClientSide || player.tickCount.toLong() % TICK_INTERVAL != 0L) return
         val target = ambient(player)
-        player.inventory.items.indices.forEach { slot ->
-            val stack = player.inventory.items[slot]
-            if (stack.isEdible) player.inventory.items[slot] = tick(stack, target, player.level().gameTime)
+        listOf(player.inventory.items, player.inventory.armor, player.inventory.offhand).forEach { inventory ->
+            inventory.indices.forEach { slot ->
+                val stack = inventory[slot]
+                if (stack.isEdible) inventory[slot] = tick(stack, target, player.level().gameTime)
+            }
         }
     }
+
+    @SubscribeEvent
+    fun onLevelLoad(event: LevelEvent.Load) {
+        (event.level as? ServerLevel)?.let(::trackedInventories)
+    }
+
+    @SubscribeEvent
+    fun onLevelUnload(event: LevelEvent.Unload) {
+        val level = event.level as? ServerLevel ?: return
+        trackedInventoryPositionsByLevel.remove(level.dimension())
+    }
+
+    @SubscribeEvent
+    fun onChunkLoad(event: ChunkEvent.Load) {
+        val level = event.level as? ServerLevel ?: return
+        val chunk = event.chunk as? LevelChunk ?: return
+        chunk.blockEntities.values.forEach { trackInventory(level, it) }
+    }
+
+    @SubscribeEvent
+    fun onChunkUnload(event: ChunkEvent.Unload) {
+        val level = event.level as? ServerLevel ?: return
+        val tracked = trackedInventoryPositionsByLevel[level.dimension()] ?: return
+        val chunkPos = event.chunk.pos
+        val iterator = tracked.iterator()
+        while (iterator.hasNext()) {
+            val packedPos = iterator.nextLong()
+            if (SectionPos.blockToSectionCoord(BlockPos.getX(packedPos)) == chunkPos.x &&
+                SectionPos.blockToSectionCoord(BlockPos.getZ(packedPos)) == chunkPos.z) {
+                iterator.remove()
+            }
+        }
+    }
+
+    @SubscribeEvent
+    fun onBlockPlaced(event: BlockEvent.EntityPlaceEvent) {
+        val level = event.level as? ServerLevel ?: return
+        level.getBlockEntity(event.pos)?.let { trackInventory(level, it) }
+    }
+
+    @SubscribeEvent
+    fun onBlockBroken(event: BlockEvent.BreakEvent) {
+        val level = event.level as? ServerLevel ?: return
+        trackedInventoryPositionsByLevel[level.dimension()]?.remove(event.pos.asLong())
+    }
+
+    @SubscribeEvent
+    fun onLevelTick(event: TickEvent.LevelTickEvent) {
+        if (event.phase != TickEvent.Phase.END) return
+        val level = event.level as? ServerLevel ?: return
+        if (level.gameTime % TICK_INTERVAL != 0L) return
+        tickTrackedInventories(level, level.gameTime)
+    }
+
+    /** Public for GameTests; production calls this from the server level tick. */
+    fun tickTrackedInventories(level: ServerLevel, gameTime: Long) {
+        val tracked = trackedInventoryPositionsByLevel[level.dimension()] ?: return
+        val iterator = tracked.iterator()
+        while (iterator.hasNext()) {
+            val pos = BlockPos.of(iterator.nextLong())
+            if (!level.isLoaded(pos)) {
+                iterator.remove()
+                continue
+            }
+            val blockEntity = level.getBlockEntity(pos)
+            if (blockEntity == null || blockEntity.isRemoved || !isInventory(blockEntity)) {
+                iterator.remove()
+                continue
+            }
+            tickBlockInventory(level, blockEntity, gameTime)
+        }
+    }
+
+    /** Public for GameTests and for inventories placed after their chunk has loaded. */
+    fun trackInventory(level: ServerLevel, blockEntity: BlockEntity) {
+        if (isInventory(blockEntity)) trackedInventories(level).add(blockEntity.blockPos.asLong())
+    }
+
+    private fun tickBlockInventory(level: Level, blockEntity: BlockEntity, gameTime: Long) {
+        if (blockEntity is Container) {
+            tickContainer(level, blockEntity.blockPos, blockEntity, gameTime)
+            return
+        }
+        val target = containerTarget(level, blockEntity.blockPos)
+        blockEntity.getCapability(ForgeCapabilities.ITEM_HANDLER).ifPresent { handler ->
+            val writable = handler as? IItemHandlerModifiable ?: return@ifPresent
+            for (slot in 0 until writable.slots) {
+                val stack = writable.getStackInSlot(slot)
+                if (stack.isEdible) writable.setStackInSlot(slot, tick(stack, target.temperatureK, gameTime, target.appliance))
+            }
+        }
+    }
+
+    private fun isInventory(blockEntity: BlockEntity): Boolean =
+        blockEntity is Container || blockEntity.getCapability(ForgeCapabilities.ITEM_HANDLER).isPresent
+
+    private fun trackedInventories(level: ServerLevel): LongOpenHashSet =
+        trackedInventoryPositionsByLevel.getOrPut(level.dimension(), ::LongOpenHashSet)
 
     @SubscribeEvent
     fun onUseStart(event: LivingEntityUseItemEvent.Start) {
