@@ -68,11 +68,11 @@ class FoodThermalGameTests {
     @GameTest(template = "coolant_exchanger", timeoutTicks = 20)
     fun frozenFoodPausesSpoilage(helper: GameTestHelper) {
         val frozenApple = ItemStack(Items.APPLE)
-        thermalState(frozenApple, temperature = 268.15, target = 268.15)
+        thermalState(frozenApple, temperature = 268.15)
         FoodThermalService.tick(frozenApple, 268.15, 24_000)
 
         val warmApple = ItemStack(Items.APPLE)
-        thermalState(warmApple, temperature = 295.15, target = 295.15)
+        thermalState(warmApple, temperature = 295.15)
         FoodThermalService.tick(warmApple, 295.15, 24_000)
 
         helper.succeedIf {
@@ -84,7 +84,7 @@ class FoodThermalGameTests {
     @GameTest(template = "coolant_exchanger", timeoutTicks = 20)
     fun foodTintIntensifiesThroughSpoilageStages(helper: GameTestHelper) {
         val food = ItemStack(Items.APPLE)
-        thermalState(food, temperature = 295.15, target = 295.15)
+        thermalState(food, temperature = 295.15)
         food.tag!!.getCompound("heat_sync_food").putDouble("decay", 0.0)
         val fresh = FoodThermalService.itemTint(food)
         food.tag!!.getCompound("heat_sync_food").putDouble("decay", 1.0 / 7.0)
@@ -93,13 +93,13 @@ class FoodThermalGameTests {
         val spoiled = FoodThermalService.itemTint(food)
         food.tag!!.getCompound("heat_sync_food").putDouble("decay", 5.0 / 7.0)
         val rotten = FoodThermalService.itemTint(food)
-        food.tag!!.getCompound("heat_sync_food").putDouble("temperature_k", 268.15)
+        food.tag!!.getCompound("heat_sync_food").putInt("temperature_bucket_c", -1)
         val frozen = FoodThermalService.itemTint(food)
 
         helper.succeedIf {
             helper.assertTrue(fresh == 0xFFFFFF, "Fresh food must retain its native colour")
             helper.assertTrue(stale == 0xD9C9AA && spoiled == 0x916D43 && rotten == 0x392416, "Spoilage tint must intensify through each stage")
-            helper.assertTrue(frozen == 0xEAF8FF, "Frozen tint must override spoilage with ice-white blue")
+            helper.assertTrue(frozen == 0x9DDCFF, "Frozen tint must override spoilage with an explicit ice-blue tint")
         }
     }
 
@@ -111,13 +111,12 @@ class FoodThermalGameTests {
         }
     }
 
-    private fun thermalState(stack: ItemStack, temperature: Double, target: Double) {
+    private fun thermalState(stack: ItemStack, temperature: Double) {
         val state = stack.orCreateTag.getCompound("heat_sync_food")
-        state.putInt("version", 1)
-        state.putDouble("temperature_k", temperature)
+        state.putInt("version", 2)
+        state.putInt("temperature_bucket_c", kotlin.math.round((temperature - 273.15) / 5.0).toInt())
         state.putDouble("decay", 0.0)
         state.putLong("last_time", 0)
-        state.putDouble("last_target_k", target)
         stack.orCreateTag.put("heat_sync_food", state)
     }
 

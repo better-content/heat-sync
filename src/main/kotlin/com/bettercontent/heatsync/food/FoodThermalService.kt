@@ -35,20 +35,22 @@ import net.minecraftforge.eventbus.api.SubscribeEvent
 import net.minecraftforge.fml.ModList
 import net.minecraftforge.items.IItemHandlerModifiable
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet
+import java.util.concurrent.ThreadLocalRandom
 import kotlin.math.exp
 import kotlin.math.pow
 
 /** Replaces FIAHI's coupled temperature/rot scalar with independent physical temperature and decay. */
 object FoodThermalService {
     private const val KEY = "heat_sync_food"
-    private const val TEMPERATURE = "temperature_k"
+    private const val TEMPERATURE_BUCKET = "temperature_bucket_c"
     private const val DECAY = "decay"
     private const val LAST_TIME = "last_time"
-    private const val LAST_TARGET = "last_target_k"
-    private const val CHANGED = "thermally_changed"
     private const val VERSION = "version"
     private const val TICK_INTERVAL = 120L
-    private const val WORLD_TAU_TICKS = 1000.0 // 95% in five minutes
+    private const val WORLD_TAU_TICKS = 4000.0 // 95% in twenty minutes
+    private const val TEMPERATURE_BUCKET_C = 5.0
+    private const val DECAY_STEPS = 140.0
+    private const val REFRIGERATION_C = 5.0
     private val trackedInventoryPositionsByLevel = mutableMapOf<ResourceKey<Level>, LongOpenHashSet>()
 
     private data class ContainerTarget(val temperatureK: Double, val appliance: Boolean)
@@ -75,12 +77,16 @@ object FoodThermalService {
     fun state(stack: ItemStack, targetK: Double, gameTime: Long): CompoundTag {
         val root = stack.orCreateTag
         val existing = root.getCompound(KEY)
-        if (existing.contains(VERSION)) return existing
-        existing.putInt(VERSION, 1)
-        existing.putDouble(TEMPERATURE, targetK)
-        existing.putDouble(DECAY, 0.0)
+        if (existing.getInt(VERSION) >= 2) return existing
+        val migratedTemperature = if (existing.contains("temperature_k")) existing.getDouble("temperature_k") else targetK
+        val migratedDecay = existing.getDouble(DECAY)
+        existing.putInt(VERSION, 2)
+        existing.putInt(TEMPERATURE_BUCKET, bucketForKelvin(migratedTemperature))
+        existing.putDouble(DECAY, quantizeDecay(migratedDecay))
         existing.putLong(LAST_TIME, gameTime)
-        existing.putDouble(LAST_TARGET, targetK)
+        existing.remove("temperature_k")
+        existing.remove("last_target_k")
+        existing.remove("thermally_changed")
         root.put(KEY, existing)
         return existing
     }
@@ -96,16 +102,20 @@ object FoodThermalService {
         }
     }
 
-    fun temperatureK(stack: ItemStack): Double = stack.tag?.getCompound(KEY)?.getDouble(TEMPERATURE) ?: 295.15
+    fun temperatureK(stack: ItemStack): Double = stack.tag?.getCompound(KEY)
+        ?.takeIf { it.getInt(VERSION) >= 2 }
+        ?.getInt(TEMPERATURE_BUCKET)
+        ?.let(::kelvinForBucket)
+        ?: 295.15
 
     fun isFrozen(stack: ItemStack): Boolean =
         profile(stack).freezingC?.let { temperatureK(stack) - 273.15 <= it } == true
 
-    /** Item-model tint: cold is ice-white; spoilage deepens from faded brown to near-black. */
+    /** Item-model tint: frozen food is visibly ice-blue; spoilage deepens from faded brown to near-black. */
     fun itemTint(stack: ItemStack): Int {
         if (!stack.isEdible) return 0xFFFFFF
         val frozen = isFrozen(stack)
-        if (frozen) return 0xEAF8FF
+        if (frozen) return 0x9DDCFF
         return when (stage(stack)) {
             Stage.FRESH -> 0xFFFFFF
             Stage.STALE -> 0xD9C9AA
@@ -120,26 +130,31 @@ object FoodThermalService {
         val tag = state(stack, targetK, gameTime)
         val elapsed = (gameTime - tag.getLong(LAST_TIME)).coerceAtLeast(0L)
         if (elapsed == 0L) return stack
-        val old = tag.getDouble(TEMPERATURE)
-        val oldTarget = tag.getDouble(LAST_TARGET)
+        val old = kelvinForBucket(tag.getInt(TEMPERATURE_BUCKET))
         val tau = if (appliance) 200.0 else WORLD_TAU_TICKS
-        val next = oldTarget + (old - oldTarget) * exp(-elapsed / tau)
-        tag.putDouble(TEMPERATURE, next)
-        if (kotlin.math.abs(next - old) >= 5.0) tag.putBoolean(CHANGED, true)
+        val next = targetK + (old - targetK) * exp(-elapsed / tau)
+        tag.putInt(TEMPERATURE_BUCKET, bucketForKelvin(next))
         profile.days?.let { days ->
-            val celsius = next - 273.15
-            val freezing = profile.freezingC ?: Double.NEGATIVE_INFINITY
-            if (celsius > freezing) {
-                val rate = 2.0.pow((celsius - 22.0) / 10.0)
-                val added = elapsed / (days * 24000.0) * rate
-                tag.putDouble(DECAY, (tag.getDouble(DECAY) + added).coerceAtMost(1.0))
+            if (next - 273.15 > REFRIGERATION_C) {
+                val added = elapsed / (days * 24000.0)
+                tag.putDouble(DECAY, quantizeDecay(tag.getDouble(DECAY) + added))
             }
         }
         tag.putLong(LAST_TIME, gameTime)
-        tag.putDouble(LAST_TARGET, targetK)
-        if (stage(stack) == Stage.CONVERTED) return ItemStack(if (profile.meat) FoodItems.SPOILED_MEAT.get() else FoodItems.SPOILED_PRODUCE.get(), stack.count)
+        if (stage(stack) >= Stage.ROTTEN) return ItemStack(if (profile.meat) FoodItems.SPOILED_MEAT.get() else FoodItems.SPOILED_PRODUCE.get(), stack.count)
         return stack
     }
+
+    private fun bucketForKelvin(kelvin: Double): Int {
+        val bucket = (kelvin - 273.15) / TEMPERATURE_BUCKET_C
+        val lower = kotlin.math.floor(bucket).toInt()
+        return if (ThreadLocalRandom.current().nextDouble() < bucket - lower) lower + 1 else lower
+    }
+
+    private fun kelvinForBucket(bucket: Int): Double = bucket * TEMPERATURE_BUCKET_C + 273.15
+
+    private fun quantizeDecay(value: Double): Double =
+        (kotlin.math.round(value.coerceIn(0.0, 1.0) * DECAY_STEPS) / DECAY_STEPS).coerceAtMost(1.0)
 
     /** Updates a real block inventory from local Cold Sweat temperature and adjacent thermal blocks. */
     fun tickContainer(level: Level, pos: BlockPos, container: Container, gameTime: Long) {
@@ -203,6 +218,17 @@ object FoodThermalService {
             inventory.indices.forEach { slot ->
                 val stack = inventory[slot]
                 if (stack.isEdible) inventory[slot] = tick(stack, target, player.level().gameTime)
+            }
+        }
+    }
+
+    @SubscribeEvent
+    fun onPlayerLoggedIn(event: net.minecraftforge.event.entity.player.PlayerEvent.PlayerLoggedInEvent) {
+        val player = event.entity as? ServerPlayer ?: return
+        val now = player.level().gameTime
+        listOf(player.inventory.items, player.inventory.armor, player.inventory.offhand).forEach { inventory ->
+            inventory.forEach { stack ->
+                stack.tag?.getCompound(KEY)?.takeIf { it.getInt(VERSION) >= 2 }?.putLong(LAST_TIME, now)
             }
         }
     }
@@ -337,7 +363,7 @@ object FoodThermalService {
         val p = profile(stack)
         val c = temperatureK(stack) - 273.15
         val frozen = isFrozen(stack)
-        event.toolTip.add(Component.literal("${"%.1f".format(c)} °C — ${stage(stack).name.lowercase()}"))
+        event.toolTip.add(Component.literal("${"%.0f".format(c)} °C — ${stage(stack).name.lowercase()}"))
         if (frozen) event.toolTip.add(Component.translatable("tooltip.heat_sync.food_frozen"))
         if (p.days == null) event.toolTip.add(Component.translatable("tooltip.heat_sync.food_shelf_stable"))
     }
