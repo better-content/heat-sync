@@ -34,6 +34,11 @@ val coldSweatRuntimeCurseFileId = property("cold_sweat_runtime_curse_file_id") a
 val includeColdSweatRuntime = providers.gradleProperty("include_cold_sweat_runtime")
     .map { it.toBoolean() }
     .orElse(true)
+val gameTestRunDirectory = layout.buildDirectory.dir(
+    includeColdSweatRuntime.map { includeColdSweat ->
+        if (includeColdSweat) "run-gametest-with-cold-sweat" else "run-gametest-without-cold-sweat"
+    }
+)
 val emiVersion = property("emi_version") as String
 val emiCurseFileId = property("emi_curse_file_id") as String
 val powerGridVersion = property("powergrid_version") as String
@@ -140,7 +145,9 @@ minecraft {
             arg("--nogui")
         }
 
-        create("gameTestServer")
+        create("gameTestServer") {
+            workingDirectory(gameTestRunDirectory.get().asFile)
+        }
 
         create("data") {
             args(
@@ -334,7 +341,7 @@ tasks.named("assemble") {
 
 val syncGameTestStructures by tasks.registering(Sync::class) {
     from(layout.projectDirectory.dir("gameteststructures"))
-    into(layout.projectDirectory.dir("run/gameteststructures"))
+    into(gameTestRunDirectory.map { it.dir("gameteststructures") })
 }
 
 tasks.matching { it.name == "prepareRunGameTestServer" }.configureEach {
