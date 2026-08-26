@@ -10,7 +10,7 @@ class PipeThermalMathTest {
     fun `step applies equalization ambient source pull and loss in order`() {
         val stepped = PipeThermalMath.step(
             pipeHeat = 100.0,
-            ambientCna = 60.0,
+            ambientHeat = 60.0,
             neighborAverage = 80.0,
             sourceHeat = 20.0,
             ambientBlendRate = 0.08,
@@ -46,7 +46,7 @@ class PipeThermalMathTest {
             400.0,
             PipeThermalMath.step(
                 pipeHeat = 500.0,
-                ambientCna = 1000.0,
+                ambientHeat = 1000.0,
                 ambientBlendRate = 0.08,
                 networkEqualizationStrength = 0.30,
                 coldSourcePullRate = 0.18,

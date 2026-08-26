@@ -1,8 +1,8 @@
 package com.bettercontent.heatsync
 
 object PipeThermalMath {
-    fun blendTowardAmbient(pipeHeat: Double, ambientCna: Double): Double =
-        pipeHeat + ((ambientCna - pipeHeat) * HeatSyncConfig.ambientBlendRate())
+    fun blendTowardAmbient(pipeHeat: Double, ambientHeat: Double): Double =
+        pipeHeat + ((ambientHeat - pipeHeat) * HeatSyncConfig.ambientBlendRate())
 
     fun equalizeWithNeighbors(pipeHeat: Double, neighborAverage: Double): Double =
         pipeHeat + ((neighborAverage - pipeHeat) * HeatSyncConfig.networkEqualizationStrength())
@@ -15,12 +15,12 @@ object PipeThermalMath {
 
     fun step(
         pipeHeat: Double,
-        ambientCna: Double? = null,
+        ambientHeat: Double? = null,
         neighborAverage: Double? = null,
         sourceHeat: Double? = null
     ): Double = step(
         pipeHeat = pipeHeat,
-        ambientCna = ambientCna,
+        ambientHeat = ambientHeat,
         neighborAverage = neighborAverage,
         sourceHeat = sourceHeat,
         ambientBlendRate = HeatSyncConfig.ambientBlendRate(),
@@ -33,7 +33,7 @@ object PipeThermalMath {
 
     fun step(
         pipeHeat: Double,
-        ambientCna: Double? = null,
+        ambientHeat: Double? = null,
         neighborAverage: Double? = null,
         sourceHeat: Double? = null,
         ambientBlendRate: Double,
@@ -44,7 +44,7 @@ object PipeThermalMath {
         maxPipeHeat: Double
     ): Double = PipeThermalStepMath.step(
         pipeHeat = pipeHeat,
-        ambientCna = ambientCna,
+        ambientHeat = ambientHeat,
         neighborAverage = neighborAverage,
         sourceHeat = sourceHeat,
         ambientBlendRate = ambientBlendRate,

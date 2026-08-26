@@ -136,7 +136,7 @@ object HeatSyncPipeThermalController {
         val sourceHeat = resolveSourceHeat(level, pipe.blockPos)
         val nextHeat = PipeThermalMath.step(
             pipeHeat = currentHeat,
-            ambientCna = ambientHeat,
+            ambientHeat = ambientHeat,
             neighborAverage = neighborAverage,
             sourceHeat = sourceHeat,
             ambientBlendRate = parameters.ambientBlendRate,

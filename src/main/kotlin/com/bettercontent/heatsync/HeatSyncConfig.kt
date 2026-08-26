@@ -7,7 +7,7 @@ object HeatSyncConfig {
     private val builder = ForgeConfigSpec.Builder()
 
     private val absoluteZeroOffsetValue: ForgeConfigSpec.DoubleValue
-    private val csToCnaScaleValue: ForgeConfigSpec.DoubleValue
+    private val csToHeatScaleValue: ForgeConfigSpec.DoubleValue
     private val pipeMinHeatValue: ForgeConfigSpec.DoubleValue
     private val pipeMaxHeatValue: ForgeConfigSpec.DoubleValue
 
@@ -50,11 +50,11 @@ object HeatSyncConfig {
     init {
         builder.push("mapping")
         absoluteZeroOffsetValue = builder
-            .comment("CNA heat value that corresponds to Cold Sweat 0 MC / 0 C.")
+            .comment("Heat Sync heat value that corresponds to Cold Sweat 0 MC / 0 C.")
             .defineInRange("absolute_zero_offset", 100.0, 0.0, Double.MAX_VALUE)
-        csToCnaScaleValue = builder
-            .comment("How many CNA heat units correspond to one Cold Sweat MC unit.")
-            .defineInRange("cs_to_cna_scale", 40.0, 0.0001, Double.MAX_VALUE)
+        csToHeatScaleValue = builder
+            .comment("How many Heat Sync heat units correspond to one Cold Sweat MC unit.")
+            .defineInRange("cs_to_heat_scale", 40.0, 0.0001, Double.MAX_VALUE)
         pipeMinHeatValue = builder
             .comment("Minimum pipe heat. Zero is absolute zero in the bridge model.")
             .defineInRange("pipe_min_heat", 0.0, 0.0, Double.MAX_VALUE)
@@ -104,7 +104,7 @@ object HeatSyncConfig {
             .comment("How strongly local Cold Sweat ambient pulls pipe heat toward its baseline each update.")
             .defineInRange("ambient_blend_rate", 0.08, 0.0, 1.0)
         pipeLossPerTickValue = builder
-            .comment("Passive loss toward CNA zero per update.")
+            .comment("Passive loss toward Heat Sync neutral per update.")
             .defineInRange("pipe_loss_per_tick", 0.5, 0.0, Double.MAX_VALUE)
         networkEqualizationStrengthValue = builder
             .comment("How strongly connected neighbors pull a pipe toward their average heat.")
@@ -128,13 +128,13 @@ object HeatSyncConfig {
 
         builder.push("cold_sources")
         iceSourceHeatValue = builder
-            .comment("Target CNA heat for adjacent ice.")
+            .comment("Target Heat Sync heat for adjacent ice.")
             .defineInRange("ice_source_heat", 80.0, 0.0, Double.MAX_VALUE)
         packedIceSourceHeatValue = builder
-            .comment("Target CNA heat for adjacent packed ice.")
+            .comment("Target Heat Sync heat for adjacent packed ice.")
             .defineInRange("packed_ice_source_heat", 50.0, 0.0, Double.MAX_VALUE)
         blueIceSourceHeatValue = builder
-            .comment("Target CNA heat for adjacent blue ice.")
+            .comment("Target Heat Sync heat for adjacent blue ice.")
             .defineInRange("blue_ice_source_heat", 20.0, 0.0, Double.MAX_VALUE)
         taggedColdSourceDefaultHeatValue = builder
             .comment("Target heat for any other block in heat_sync:pipe_cold_sources.")
@@ -170,7 +170,7 @@ object HeatSyncConfig {
 
     fun absoluteZeroOffset(): Double = absoluteZeroOffsetValue.get()
 
-    fun csToCnaScale(): Double = csToCnaScaleValue.get()
+    fun csToHeatScale(): Double = csToHeatScaleValue.get()
 
     fun pipeMinHeat(): Double = pipeMinHeatValue.get()
 

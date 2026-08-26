@@ -25,7 +25,7 @@ object HeatSyncPonderScenes {
         val coldPipe = util.select().position(3, 1, 1)
         val fullSetup = util.select().fromTo(2, 1, 1, 3, 2, 3)
 
-        scene.title("coolant_exchanger", "Exchanging fluids with CNA heat")
+        scene.title("coolant_exchanger", "Exchanging fluids with Heat Sync heat")
         scene.configureBasePlate(0, 0, 5)
         scene.showBasePlate()
         scene.idle(5)
@@ -37,7 +37,7 @@ object HeatSyncPonderScenes {
 
         scene.world().setBlock(exchangerPos, HeatSyncRegistries.COOLANT_EXCHANGER.get().defaultBlockState(), false)
         scene.overlay().showText(80)
-            .text("Coolant Exchangers sit on CNA heat lines and convert supported fluids directly in their tank.")
+            .text("Coolant Exchangers sit on Heat Sync heat lines and convert supported fluids directly in their tank.")
             .colored(PonderPalette.WHITE)
             .pointAt(util.vector().topOf(exchangerPos))
             .placeNearTarget()
@@ -88,7 +88,7 @@ object HeatSyncPonderScenes {
 
         scene.overlay().showOutline(PonderPalette.GREEN, "full_setup", fullSetup, 80)
         scene.overlay().showText(80)
-            .text("The exchanger only needs fluid access and a CNA heat connection; the amount of heat per bucket comes from the coolant JSON.")
+            .text("The exchanger only needs fluid access and a Heat Sync heat connection; the amount of heat per bucket comes from the coolant JSON.")
             .colored(PonderPalette.GREEN)
             .pointAt(util.vector().centerOf(exchangerPos))
             .placeNearTarget()

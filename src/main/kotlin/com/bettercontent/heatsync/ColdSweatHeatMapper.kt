@@ -5,7 +5,7 @@ object ColdSweatHeatMapper {
         coldSweatToPipeHeat(
             coldSweatWorldTemp = coldSweatWorldTemp,
             absoluteZeroOffset = HeatSyncConfig.absoluteZeroOffset(),
-            coldSweatUnitScale = HeatSyncConfig.csToCnaScale(),
+            coldSweatUnitScale = HeatSyncConfig.csToHeatScale(),
             minPipeHeat = HeatSyncConfig.pipeMinHeat()
         )
 
@@ -13,7 +13,7 @@ object ColdSweatHeatMapper {
         pipeHeatToColdSweat(
             pipeHeat = pipeHeat,
             absoluteZeroOffset = HeatSyncConfig.absoluteZeroOffset(),
-            coldSweatUnitScale = HeatSyncConfig.csToCnaScale()
+            coldSweatUnitScale = HeatSyncConfig.csToHeatScale()
         )
 
     fun coldSweatToPipeHeat(
