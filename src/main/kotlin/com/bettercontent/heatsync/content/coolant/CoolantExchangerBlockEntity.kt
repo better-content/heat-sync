@@ -18,6 +18,8 @@ import net.minecraft.resources.ResourceLocation
 import net.minecraft.world.level.Level
 import net.minecraft.world.level.block.entity.BlockEntity
 import net.minecraft.world.level.block.state.BlockState
+import net.minecraft.server.level.ServerPlayer
+import java.util.UUID
 import net.minecraftforge.common.capabilities.Capability
 import net.minecraftforge.common.capabilities.ForgeCapabilities
 import net.minecraftforge.common.util.LazyOptional
@@ -33,6 +35,8 @@ class CoolantExchangerBlockEntity(
     IHaveGoggleInformation {
     private var heat: Float = 0f
     private var tickCounter: Long = 0L
+    private var threadEpisode: String? = null
+    private var threadPlayer: UUID? = null
 
     private val tank = object : FluidTank(TANK_CAPACITY) {
         override fun isFluidValid(stack: FluidStack): Boolean {
@@ -53,6 +57,8 @@ class CoolantExchangerBlockEntity(
         super.load(tag)
         heat = tag.getFloat(HEAT_KEY).coerceAtLeast(ABSOLUTE_ZERO)
         tickCounter = tag.getLong(TICK_KEY)
+        threadEpisode = tag.getString(THREAD_EPISODE_KEY).takeIf { it.isNotBlank() }
+        threadPlayer = if (tag.hasUUID(THREAD_PLAYER_KEY)) tag.getUUID(THREAD_PLAYER_KEY) else null
         tank.readFromNBT(tag.getCompound(TANK_KEY))
     }
 
@@ -60,6 +66,8 @@ class CoolantExchangerBlockEntity(
         super.saveAdditional(tag)
         tag.putFloat(HEAT_KEY, heat)
         tag.putLong(TICK_KEY, tickCounter)
+        threadEpisode?.let { tag.putString(THREAD_EPISODE_KEY, it) }
+        threadPlayer?.let { tag.putUUID(THREAD_PLAYER_KEY, it) }
         tag.put(TANK_KEY, tank.writeToNBT(CompoundTag()))
     }
 
@@ -139,6 +147,7 @@ class CoolantExchangerBlockEntity(
         val convertedAfterTransfer = if (convertedBeforeTransfer) false else processFluid()
         val buffered = clampWorkingHeat()
         val changed = convertedBeforeTransfer || convertedAfterTransfer || buffered
+        updateThreadEpisode(convertedBeforeTransfer || convertedAfterTransfer)
 
         if (tickCounter % NETWORK_TRANSFER_INTERVAL == 0L) {
             if (!canSpendHeatIntoFluidThisTick(convertedBeforeTransfer || convertedAfterTransfer)) {
@@ -149,6 +158,23 @@ class CoolantExchangerBlockEntity(
             sendData()
         }
     }
+
+    private fun updateThreadEpisode(converted: Boolean) {
+        val serverLevel = level as? net.minecraft.server.level.ServerLevel ?: return
+        if (heat > INTERNAL_HEAT_BUFFER && threadEpisode == null) {
+            val player = serverLevel.getNearestPlayer(blockPos.x + .5, blockPos.y + .5, blockPos.z + .5, 16.0, false) as? ServerPlayer ?: return
+            threadEpisode = "${player.uuid}:heat:${blockPos.asLong()}:${serverLevel.gameTime}"
+            threadPlayer = player.uuid
+            emit(player, "heat_excess", "network", threadEpisode!!)
+            setChanged()
+        } else if (converted && heat <= INTERNAL_HEAT_BUFFER && threadEpisode != null && threadPlayer != null) {
+            val player = serverLevel.server.playerList.getPlayer(threadPlayer!!) ?: return
+            emit(player, "heat_safe", "safe", threadEpisode!!)
+            threadEpisode = null;threadPlayer = null;setChanged()
+        }
+    }
+
+    private fun emit(player: ServerPlayer,type: String,value: String,token: String) { try { Class.forName("com.bettercontent.threads.api.ThreadSignals").getMethod("emit",ServerPlayer::class.java,String::class.java,String::class.java,String::class.java).invoke(null,player,type,value,token) } catch (_: ReflectiveOperationException) {} }
 
     private fun processFluid(): Boolean {
         val stack = tank.fluid
@@ -225,6 +251,8 @@ class CoolantExchangerBlockEntity(
         private const val HEAT_KEY = "Heat"
         private const val TANK_KEY = "Tank"
         private const val TICK_KEY = "TickCounter"
+        private const val THREAD_EPISODE_KEY = "ThreadHeatEpisode"
+        private const val THREAD_PLAYER_KEY = "ThreadHeatPlayer"
 
         @JvmStatic
         @Suppress("UNUSED_PARAMETER")

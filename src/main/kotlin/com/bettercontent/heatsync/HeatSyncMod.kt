@@ -4,6 +4,7 @@ import com.bettercontent.heatsync.command.HeatSyncCommands
 import com.bettercontent.heatsync.compat.powergrid.PowerGridHeatBridge
 import com.bettercontent.heatsync.compat.pneumaticcraft.PneumaticHeatBridge
 import com.bettercontent.heatsync.compat.create.CreateBoilerHeaterBridge
+import com.bettercontent.heatsync.compat.ThreadsTemperatureBridge
 import com.bettercontent.heatsync.food.FoodThermalService
 import com.bettercontent.heatsync.api.ThermalCapabilityBridge
 import com.bettercontent.heatsync.content.coolant.LiquidCoolantManager
@@ -40,6 +41,7 @@ class HeatSyncMod(modLoadingContext: FMLJavaModLoadingContext) {
 
         if (ModList.get().isLoaded(COLD_SWEAT_MOD_ID)) {
             HeatSyncColdSweatBridge.initialize(MinecraftForge.EVENT_BUS)
+            MinecraftForge.EVENT_BUS.register(ThreadsTemperatureBridge)
         }
         if (ModList.get().isLoaded(PowerGridHeatBridge.MOD_ID)) {
             PowerGridHeatBridge.initialize(MinecraftForge.EVENT_BUS)
