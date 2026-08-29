@@ -176,8 +176,8 @@ object FoodThermalService {
             ?: ContainerTarget(ambient(level, pos), appliance = false)
 
     fun adjacentThermalTarget(level: Level, pos: BlockPos): Double? {
-        val temperatures = Direction.values().mapNotNull { direction ->
-            val source = level.getBlockEntity(pos.relative(direction)) ?: return@mapNotNull null
+        val temperatures = loadedAdjacentPositions(pos, level::isLoaded).mapNotNull { (direction, sourcePos) ->
+            val source = level.getBlockEntity(sourcePos) ?: return@mapNotNull null
             source.getCapability(ThermalCapabilities.BODY, direction.opposite)
                 .resolve()
                 .orElseGet {
@@ -189,8 +189,8 @@ object FoodThermalService {
     }
 
     private fun adjacentPassiveColdTarget(level: Level, pos: BlockPos): Double? =
-        Direction.values().mapNotNull { direction ->
-            when (level.getBlockState(pos.relative(direction)).block) {
+        loadedAdjacentPositions(pos, level::isLoaded).mapNotNull { (_, sourcePos) ->
+            when (level.getBlockState(sourcePos).block) {
                 Blocks.SNOW_BLOCK -> 268.15
                 Blocks.ICE -> 273.15
                 Blocks.PACKED_ICE -> 263.15
@@ -198,6 +198,15 @@ object FoodThermalService {
                 else -> null
             }
         }.takeIf { it.isNotEmpty() }?.average()
+
+    /** Neighbor enumeration is loaded-only so thermal inventory ticks can never request chunk generation. */
+    internal fun loadedAdjacentPositions(
+        pos: BlockPos,
+        isLoaded: (BlockPos) -> Boolean,
+    ): List<Pair<Direction, BlockPos>> = Direction.values().mapNotNull { direction ->
+        val neighbor = pos.relative(direction)
+        if (isLoaded(neighbor)) direction to neighbor else null
+    }
 
     private fun ambient(player: Player): Double {
         val mc = runCatching { Temperature.get(player, Temperature.Trait.WORLD) }.getOrDefault(0.88)
