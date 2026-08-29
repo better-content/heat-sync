@@ -36,6 +36,7 @@ import net.minecraftforge.fml.ModList
 import net.minecraftforge.items.IItemHandlerModifiable
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet
 import java.util.concurrent.ThreadLocalRandom
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.exp
 import kotlin.math.pow
 
@@ -51,7 +52,7 @@ object FoodThermalService {
     private const val TEMPERATURE_BUCKET_C = 5.0
     private const val DECAY_STEPS = 140.0
     private const val REFRIGERATION_C = 5.0
-    private val trackedInventoryPositionsByLevel = mutableMapOf<ResourceKey<Level>, LongOpenHashSet>()
+    private val trackedInventoryPositionsByLevel = ConcurrentHashMap<ResourceKey<Level>, LongOpenHashSet>()
 
     private data class ContainerTarget(val temperatureK: Double, val appliance: Boolean)
 
@@ -256,14 +257,15 @@ object FoodThermalService {
         val level = event.level as? ServerLevel ?: return
         val tracked = trackedInventoryPositionsByLevel[level.dimension()] ?: return
         val chunkPos = event.chunk.pos
-        val iterator = tracked.iterator()
-        while (iterator.hasNext()) {
-            val packedPos = iterator.nextLong()
+        val removed = synchronized(tracked) { tracked.toLongArray() }.filter { packedPos ->
             if (SectionPos.blockToSectionCoord(BlockPos.getX(packedPos)) == chunkPos.x &&
                 SectionPos.blockToSectionCoord(BlockPos.getZ(packedPos)) == chunkPos.z) {
-                iterator.remove()
+                true
+            } else {
+                false
             }
         }
+        synchronized(tracked) { removed.forEach(tracked::remove) }
     }
 
     @SubscribeEvent
@@ -275,7 +277,9 @@ object FoodThermalService {
     @SubscribeEvent
     fun onBlockBroken(event: BlockEvent.BreakEvent) {
         val level = event.level as? ServerLevel ?: return
-        trackedInventoryPositionsByLevel[level.dimension()]?.remove(event.pos.asLong())
+        trackedInventoryPositionsByLevel[level.dimension()]?.let { tracked ->
+            synchronized(tracked) { tracked.remove(event.pos.asLong()) }
+        }
     }
 
     @SubscribeEvent
@@ -289,25 +293,29 @@ object FoodThermalService {
     /** Public for GameTests; production calls this from the server level tick. */
     fun tickTrackedInventories(level: ServerLevel, gameTime: Long) {
         val tracked = trackedInventoryPositionsByLevel[level.dimension()] ?: return
-        val iterator = tracked.iterator()
-        while (iterator.hasNext()) {
-            val pos = BlockPos.of(iterator.nextLong())
+        val snapshot = synchronized(tracked) { tracked.toLongArray() }
+        val removed = mutableListOf<Long>()
+        snapshot.forEach { packedPos ->
+            val pos = BlockPos.of(packedPos)
             if (!level.isLoaded(pos)) {
-                iterator.remove()
-                continue
+                removed += packedPos
+                return@forEach
             }
             val blockEntity = level.getBlockEntity(pos)
             if (blockEntity == null || blockEntity.isRemoved || !isInventory(blockEntity)) {
-                iterator.remove()
-                continue
+                removed += packedPos
+                return@forEach
             }
             tickBlockInventory(level, blockEntity, gameTime)
         }
+        synchronized(tracked) { removed.forEach(tracked::remove) }
     }
 
     /** Public for GameTests and for inventories placed after their chunk has loaded. */
     fun trackInventory(level: ServerLevel, blockEntity: BlockEntity) {
-        if (isInventory(blockEntity)) trackedInventories(level).add(blockEntity.blockPos.asLong())
+        if (isInventory(blockEntity)) trackedInventories(level).let { tracked ->
+            synchronized(tracked) { tracked.add(blockEntity.blockPos.asLong()) }
+        }
     }
 
     private fun tickBlockInventory(level: Level, blockEntity: BlockEntity, gameTime: Long) {
@@ -329,7 +337,7 @@ object FoodThermalService {
         blockEntity is Container || blockEntity.getCapability(ForgeCapabilities.ITEM_HANDLER).isPresent
 
     private fun trackedInventories(level: ServerLevel): LongOpenHashSet =
-        trackedInventoryPositionsByLevel.getOrPut(level.dimension(), ::LongOpenHashSet)
+        trackedInventoryPositionsByLevel.computeIfAbsent(level.dimension()) { LongOpenHashSet() }
 
     @SubscribeEvent
     fun onUseStart(event: LivingEntityUseItemEvent.Start) {

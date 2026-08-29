@@ -65,6 +65,21 @@ class FoodThermalGameTests {
         }
     }
 
+    @GameTest(template = "coolant_exchanger", timeoutTicks = 40)
+    fun inventorySchedulerPrunesRemovedPositionsFromStableSnapshot(helper: GameTestHelper) {
+        val level = helper.level as ServerLevel
+        val positions = (0 until 32).map { index -> BlockPos(10 + index % 8, 1, 10 + index / 8) }
+        positions.forEach { pos ->
+            helper.setBlock(pos, Blocks.BARREL)
+            FoodThermalService.trackInventory(level, requireNotNull(helper.getBlockEntity(pos)))
+        }
+        positions.forEach { helper.setBlock(it, Blocks.AIR) }
+
+        FoodThermalService.tickTrackedInventories(level, 0)
+        FoodThermalService.tickTrackedInventories(level, 4_000)
+        helper.succeed()
+    }
+
     @GameTest(template = "coolant_exchanger", timeoutTicks = 20)
     fun frozenFoodPausesSpoilage(helper: GameTestHelper) {
         val frozenApple = ItemStack(Items.APPLE)
