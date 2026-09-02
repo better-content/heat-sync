@@ -3,7 +3,10 @@
   "minVersion": "0.8",
   "package": "com.bettercontent.heatsync.mixin",
   "compatibilityLevel": "JAVA_17",
-  "mixins": [],
+  "mixins": [
+    "minecraft.BlockEntityMixin",
+    "minecraft.InventoryMixin"
+  ],
   "injectors": {
     "defaultRequire": 1
   }

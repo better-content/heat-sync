@@ -8,7 +8,6 @@ import net.minecraft.gametest.framework.GameTest
 import net.minecraft.gametest.framework.GameTestHelper
 import net.minecraft.world.item.ItemStack
 import net.minecraft.world.item.Items
-import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.level.block.Blocks
 import net.minecraft.world.level.block.entity.BarrelBlockEntity
 import net.minecraft.world.level.block.entity.ChestBlockEntity
@@ -48,36 +47,32 @@ class FoodThermalGameTests {
     }
 
     @GameTest(template = "coolant_exchanger", timeoutTicks = 20)
-    fun barrelBesidePackedIceFreezesThroughInventoryScheduler(helper: GameTestHelper) {
+    fun activatedBarrelReconcilesFoodWithoutInventoryScheduler(helper: GameTestHelper) {
         val barrelPos = BlockPos(2, 1, 2)
         helper.setBlock(barrelPos, Blocks.BARREL)
         helper.setBlock(barrelPos.west(), Blocks.PACKED_ICE)
         val barrel = requireNotNull(helper.getBlockEntity(barrelPos) as? BarrelBlockEntity)
         barrel.setItem(0, ItemStack(Items.COOKED_BEEF))
 
-        val level = helper.level as ServerLevel
-        FoodThermalService.trackInventory(level, barrel)
-        FoodThermalService.tickTrackedInventories(level, 0)
-        FoodThermalService.tickTrackedInventories(level, 4_000)
+        FoodThermalService.activateInventory(barrel, reconcileNow = true)
+        FoodThermalService.tickContainer(helper.level, barrel.blockPos, barrel, 4_000)
 
         helper.succeedIf {
-            helper.assertTrue(FoodThermalService.isFrozen(barrel.getItem(0)), "Packed ice beside a barrel must freeze food through the normal inventory scheduler")
+            helper.assertTrue(FoodThermalService.isActivated(barrel), "A gameplay inventory must retain its thermal activation marker")
+            helper.assertTrue(FoodThermalService.isFrozen(barrel.getItem(0)), "Packed ice beside an activated barrel must freeze food")
         }
     }
 
     @GameTest(template = "coolant_exchanger", timeoutTicks = 40)
-    fun inventorySchedulerPrunesRemovedPositionsFromStableSnapshot(helper: GameTestHelper) {
-        val level = helper.level as ServerLevel
-        val positions = (0 until 32).map { index -> BlockPos(10 + index % 8, 1, 10 + index / 8) }
-        positions.forEach { pos ->
-            helper.setBlock(pos, Blocks.BARREL)
-            FoodThermalService.trackInventory(level, requireNotNull(helper.getBlockEntity(pos)))
+    fun untouchedWorldgenStyleInventoryDoesNotActivateFromMutation(helper: GameTestHelper) {
+        val pos = BlockPos(2, 1, 2)
+        helper.setBlock(pos, Blocks.BARREL)
+        val barrel = requireNotNull(helper.getBlockEntity(pos) as? BarrelBlockEntity)
+        barrel.setItem(0, ItemStack(Items.APPLE))
+        helper.succeedIf {
+            helper.assertTrue(!FoodThermalService.isActivated(barrel), "An untouched inventory must remain thermally dormant")
+            helper.assertTrue(barrel.getItem(0).tag?.contains("heat_sync_food") != true, "Dormant loot must remain fresh")
         }
-        positions.forEach { helper.setBlock(it, Blocks.AIR) }
-
-        FoodThermalService.tickTrackedInventories(level, 0)
-        FoodThermalService.tickTrackedInventories(level, 4_000)
-        helper.succeed()
     }
 
     @GameTest(template = "coolant_exchanger", timeoutTicks = 20)
@@ -128,8 +123,11 @@ class FoodThermalGameTests {
 
     private fun thermalState(stack: ItemStack, temperature: Double) {
         val state = stack.orCreateTag.getCompound("heat_sync_food")
-        state.putInt("version", 2)
-        state.putInt("temperature_bucket_c", kotlin.math.round((temperature - 273.15) / 5.0).toInt())
+        val bucket = kotlin.math.round((temperature - 273.15) / 5.0).toInt()
+        state.putInt("version", 3)
+        state.putInt("temperature_bucket_c", bucket)
+        state.putInt("last_target_bucket_c", bucket)
+        state.putBoolean("last_target_appliance", false)
         state.putDouble("decay", 0.0)
         state.putLong("last_time", 0)
         stack.orCreateTag.put("heat_sync_food", state)

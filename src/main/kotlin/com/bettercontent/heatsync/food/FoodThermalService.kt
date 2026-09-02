@@ -7,36 +7,31 @@ import com.bettercontent.heatsync.api.HeatBlockEntity
 import com.bettercontent.heatsync.api.HeatStorageThermalBody
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Direction
-import net.minecraft.core.SectionPos
 import com.momosoftworks.coldsweat.api.util.Temperature
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.network.chat.Component
 import net.minecraft.server.level.ServerPlayer
 import net.minecraft.util.Mth
 import net.minecraft.world.effect.MobEffectInstance
-import net.minecraft.world.entity.item.ItemEntity
 import net.minecraft.world.entity.player.Player
 import net.minecraft.world.Container
 import net.minecraft.world.item.ItemStack
 import net.minecraft.world.level.Level
 import net.minecraft.world.level.block.Blocks
 import net.minecraft.world.level.block.entity.BlockEntity
-import net.minecraft.world.level.chunk.LevelChunk
-import net.minecraft.resources.ResourceKey
 import net.minecraft.server.level.ServerLevel
+import net.minecraftforge.common.util.FakePlayer
 import net.minecraftforge.common.capabilities.ForgeCapabilities
-import net.minecraftforge.event.TickEvent
 import net.minecraftforge.event.entity.living.LivingEntityUseItemEvent
 import net.minecraftforge.event.entity.player.ItemTooltipEvent
+import net.minecraftforge.event.entity.player.PlayerInteractEvent
 import net.minecraftforge.event.level.BlockEvent
-import net.minecraftforge.event.level.ChunkEvent
-import net.minecraftforge.event.level.LevelEvent
 import net.minecraftforge.eventbus.api.SubscribeEvent
 import net.minecraftforge.fml.ModList
 import net.minecraftforge.items.IItemHandlerModifiable
-import it.unimi.dsi.fastutil.longs.LongOpenHashSet
+import java.util.Collections
+import java.util.WeakHashMap
 import java.util.concurrent.ThreadLocalRandom
-import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.exp
 import kotlin.math.pow
 
@@ -46,13 +41,18 @@ object FoodThermalService {
     private const val TEMPERATURE_BUCKET = "temperature_bucket_c"
     private const val DECAY = "decay"
     private const val LAST_TIME = "last_time"
+    private const val LAST_TARGET_BUCKET = "last_target_bucket_c"
+    private const val LAST_TARGET_APPLIANCE = "last_target_appliance"
     private const val VERSION = "version"
-    private const val TICK_INTERVAL = 120L
+    private const val ACTIVE = "heat_sync_food_active"
+    private const val CURRENT_VERSION = 3
     private const val WORLD_TAU_TICKS = 4000.0 // 95% in twenty minutes
     private const val TEMPERATURE_BUCKET_C = 5.0
     private const val DECAY_STEPS = 140.0
     private const val REFRIGERATION_C = 5.0
-    private val trackedInventoryPositionsByLevel = ConcurrentHashMap<ResourceKey<Level>, LongOpenHashSet>()
+    private val inventoryFingerprints = Collections.synchronizedMap(WeakHashMap<BlockEntity, Int>())
+    private val playerInventoryFingerprints = Collections.synchronizedMap(WeakHashMap<Player, Int>())
+    private val reconciling = ThreadLocal.withInitial { false }
 
     private data class ContainerTarget(val temperatureK: Double, val appliance: Boolean)
 
@@ -78,16 +78,15 @@ object FoodThermalService {
     fun state(stack: ItemStack, targetK: Double, gameTime: Long): CompoundTag {
         val root = stack.orCreateTag
         val existing = root.getCompound(KEY)
-        if (existing.getInt(VERSION) >= 2) return existing
-        val migratedTemperature = if (existing.contains("temperature_k")) existing.getDouble("temperature_k") else targetK
-        val migratedDecay = existing.getDouble(DECAY)
-        existing.putInt(VERSION, 2)
-        existing.putInt(TEMPERATURE_BUCKET, bucketForKelvin(migratedTemperature))
-        existing.putDouble(DECAY, quantizeDecay(migratedDecay))
+        if (existing.getInt(VERSION) == CURRENT_VERSION) return existing
+        existing.allKeys.toList().forEach(existing::remove)
+        val targetBucket = bucketForKelvin(targetK)
+        existing.putInt(VERSION, CURRENT_VERSION)
+        existing.putInt(TEMPERATURE_BUCKET, targetBucket)
+        existing.putDouble(DECAY, 0.0)
         existing.putLong(LAST_TIME, gameTime)
-        existing.remove("temperature_k")
-        existing.remove("last_target_k")
-        existing.remove("thermally_changed")
+        existing.putInt(LAST_TARGET_BUCKET, targetBucket)
+        existing.putBoolean(LAST_TARGET_APPLIANCE, false)
         root.put(KEY, existing)
         return existing
     }
@@ -104,7 +103,7 @@ object FoodThermalService {
     }
 
     fun temperatureK(stack: ItemStack): Double = stack.tag?.getCompound(KEY)
-        ?.takeIf { it.getInt(VERSION) >= 2 }
+        ?.takeIf { it.getInt(VERSION) == CURRENT_VERSION }
         ?.getInt(TEMPERATURE_BUCKET)
         ?.let(::kelvinForBucket)
         ?: 295.15
@@ -130,10 +129,10 @@ object FoodThermalService {
         val profile = profile(stack)
         val tag = state(stack, targetK, gameTime)
         val elapsed = (gameTime - tag.getLong(LAST_TIME)).coerceAtLeast(0L)
-        if (elapsed == 0L) return stack
         val old = kelvinForBucket(tag.getInt(TEMPERATURE_BUCKET))
-        val tau = if (appliance) 200.0 else WORLD_TAU_TICKS
-        val next = targetK + (old - targetK) * exp(-elapsed / tau)
+        val priorTarget = kelvinForBucket(tag.getInt(LAST_TARGET_BUCKET))
+        val tau = if (tag.getBoolean(LAST_TARGET_APPLIANCE)) 200.0 else WORLD_TAU_TICKS
+        val next = priorTarget + (old - priorTarget) * exp(-elapsed / tau)
         tag.putInt(TEMPERATURE_BUCKET, bucketForKelvin(next))
         profile.days?.let { days ->
             if (next - 273.15 > REFRIGERATION_C) {
@@ -142,6 +141,8 @@ object FoodThermalService {
             }
         }
         tag.putLong(LAST_TIME, gameTime)
+        tag.putInt(LAST_TARGET_BUCKET, bucketForKelvin(targetK))
+        tag.putBoolean(LAST_TARGET_APPLIANCE, appliance)
         if (stage(stack) >= Stage.ROTTEN) return ItemStack(if (profile.meat) FoodItems.SPOILED_MEAT.get() else FoodItems.SPOILED_PRODUCE.get(), stack.count)
         return stack
     }
@@ -159,10 +160,15 @@ object FoodThermalService {
 
     /** Updates a real block inventory from local Cold Sweat temperature and adjacent thermal blocks. */
     fun tickContainer(level: Level, pos: BlockPos, container: Container, gameTime: Long) {
+        val foodSlots = (0 until container.containerSize).filter { isTrackedFood(container.getItem(it)) }
+        if (foodSlots.isEmpty()) return
         val target = containerTarget(level, pos)
         for (slot in 0 until container.containerSize) {
             val stack = container.getItem(slot)
-            if (stack.isEdible) container.setItem(slot, tick(stack, target.temperatureK, gameTime, target.appliance))
+            if (isTrackedFood(stack)) {
+                val effective = target ?: storedTarget(stack)
+                container.setItem(slot, tick(stack, effective.temperatureK, gameTime, effective.appliance))
+            }
         }
     }
 
@@ -170,10 +176,10 @@ object FoodThermalService {
      * A powered Heat Sync body is an appliance setpoint.  Ice is a passive local cold source;
      * everything else follows Cold Sweat's actual world temperature at this block position.
      */
-    private fun containerTarget(level: Level, pos: BlockPos): ContainerTarget =
+    private fun containerTarget(level: Level, pos: BlockPos): ContainerTarget? =
         adjacentThermalTarget(level, pos)?.let { ContainerTarget(it, appliance = true) }
             ?: adjacentPassiveColdTarget(level, pos)?.let { ContainerTarget(it, appliance = false) }
-            ?: ContainerTarget(ambient(level, pos), appliance = false)
+            ?: ambient(level, pos)?.let { ContainerTarget(it, appliance = false) }
 
     fun adjacentThermalTarget(level: Level, pos: BlockPos): Double? {
         val temperatures = loadedAdjacentPositions(pos, level::isLoaded).mapNotNull { (direction, sourcePos) ->
@@ -213,117 +219,76 @@ object FoodThermalService {
         return mc * 25.0 + 273.15
     }
 
-    private fun ambient(level: Level, pos: BlockPos): Double {
+    private fun ambient(level: Level, pos: BlockPos): Double? {
         if (!ModList.get().isLoaded(HeatSyncMod.COLD_SWEAT_MOD_ID)) return 295.15
+        if (ModList.get().isLoaded("weather2") && level is ServerLevel &&
+            !weatherProbeChunksLoaded(pos, level::hasChunk)) return null
         val mc = runCatching { ColdSweatAmbientSampler.sampleWorldTemp(level, pos) }.getOrDefault(0.88)
         return mc * 25.0 + 273.15
     }
 
-    @SubscribeEvent
-    fun onPlayerTick(event: TickEvent.PlayerTickEvent) {
-        val player = event.player
-        if (event.phase != TickEvent.Phase.END || player.level().isClientSide || player.tickCount.toLong() % TICK_INTERVAL != 0L) return
-        val target = ambient(player)
-        listOf(player.inventory.items, player.inventory.armor, player.inventory.offhand).forEach { inventory ->
-            inventory.indices.forEach { slot ->
-                val stack = inventory[slot]
-                if (stack.isEdible) inventory[slot] = tick(stack, target, player.level().gameTime)
-            }
-        }
+    internal fun weatherProbeChunksLoaded(pos: BlockPos, hasChunk: (Int, Int) -> Boolean): Boolean {
+        val originX = pos.x shr 4
+        val originZ = pos.z shr 4
+        val offsets = intArrayOf(-6, -3, 0, 3, 6)
+        return offsets.all { dx -> offsets.all { dz -> hasChunk(originX + dx, originZ + dz) } }
     }
 
     @SubscribeEvent
     fun onPlayerLoggedIn(event: net.minecraftforge.event.entity.player.PlayerEvent.PlayerLoggedInEvent) {
         val player = event.entity as? ServerPlayer ?: return
-        val now = player.level().gameTime
-        listOf(player.inventory.items, player.inventory.armor, player.inventory.offhand).forEach { inventory ->
-            inventory.forEach { stack ->
-                stack.tag?.getCompound(KEY)?.takeIf { it.getInt(VERSION) >= 2 }?.putLong(LAST_TIME, now)
-            }
-        }
-    }
-
-    @SubscribeEvent
-    fun onLevelLoad(event: LevelEvent.Load) {
-        (event.level as? ServerLevel)?.let(::trackedInventories)
-    }
-
-    @SubscribeEvent
-    fun onLevelUnload(event: LevelEvent.Unload) {
-        val level = event.level as? ServerLevel ?: return
-        trackedInventoryPositionsByLevel.remove(level.dimension())
-    }
-
-    @SubscribeEvent
-    fun onChunkLoad(event: ChunkEvent.Load) {
-        val level = event.level as? ServerLevel ?: return
-        val chunk = event.chunk as? LevelChunk ?: return
-        chunk.blockEntities.values.forEach { trackInventory(level, it) }
-    }
-
-    @SubscribeEvent
-    fun onChunkUnload(event: ChunkEvent.Unload) {
-        val level = event.level as? ServerLevel ?: return
-        val tracked = trackedInventoryPositionsByLevel[level.dimension()] ?: return
-        val chunkPos = event.chunk.pos
-        val removed = synchronized(tracked) { tracked.toLongArray() }.filter { packedPos ->
-            if (SectionPos.blockToSectionCoord(BlockPos.getX(packedPos)) == chunkPos.x &&
-                SectionPos.blockToSectionCoord(BlockPos.getZ(packedPos)) == chunkPos.z) {
-                true
-            } else {
-                false
-            }
-        }
-        synchronized(tracked) { removed.forEach(tracked::remove) }
+        reconcilePlayerInventory(player, force = true)
     }
 
     @SubscribeEvent
     fun onBlockPlaced(event: BlockEvent.EntityPlaceEvent) {
         val level = event.level as? ServerLevel ?: return
-        level.getBlockEntity(event.pos)?.let { trackInventory(level, it) }
-    }
-
-    @SubscribeEvent
-    fun onBlockBroken(event: BlockEvent.BreakEvent) {
-        val level = event.level as? ServerLevel ?: return
-        trackedInventoryPositionsByLevel[level.dimension()]?.let { tracked ->
-            synchronized(tracked) { tracked.remove(event.pos.asLong()) }
+        if (event.entity == null) return
+        level.server.execute {
+            level.getBlockEntity(event.pos)?.let { activateInventory(it, reconcileNow = true) }
         }
     }
 
     @SubscribeEvent
-    fun onLevelTick(event: TickEvent.LevelTickEvent) {
-        if (event.phase != TickEvent.Phase.END) return
-        val level = event.level as? ServerLevel ?: return
-        if (level.gameTime % TICK_INTERVAL != 0L) return
-        tickTrackedInventories(level, level.gameTime)
+    fun onRightClickBlock(event: PlayerInteractEvent.RightClickBlock) {
+        val player = event.entity as? ServerPlayer ?: return
+        if (player is FakePlayer) return
+        val blockEntity = player.level().getBlockEntity(event.pos) ?: return
+        if (!isInventory(blockEntity)) return
+        activateInventory(blockEntity, reconcileNow = false)
+        player.server.execute { reconcileBlockInventory(blockEntity, force = true) }
     }
 
-    /** Public for GameTests; production calls this from the server level tick. */
-    fun tickTrackedInventories(level: ServerLevel, gameTime: Long) {
-        val tracked = trackedInventoryPositionsByLevel[level.dimension()] ?: return
-        val snapshot = synchronized(tracked) { tracked.toLongArray() }
-        val removed = mutableListOf<Long>()
-        snapshot.forEach { packedPos ->
-            val pos = BlockPos.of(packedPos)
-            if (!level.isLoaded(pos)) {
-                removed += packedPos
-                return@forEach
-            }
-            val blockEntity = level.getBlockEntity(pos)
-            if (blockEntity == null || blockEntity.isRemoved || !isInventory(blockEntity)) {
-                removed += packedPos
-                return@forEach
-            }
-            tickBlockInventory(level, blockEntity, gameTime)
+    @JvmStatic
+    fun onBlockEntityChanged(blockEntity: BlockEntity) {
+        if (blockEntity.level?.isClientSide != false || !blockEntity.persistentData.getBoolean(ACTIVE)) return
+        reconcileBlockInventory(blockEntity, force = false)
+    }
+
+    fun activateInventory(blockEntity: BlockEntity, reconcileNow: Boolean) {
+        if (!isInventory(blockEntity)) return
+        blockEntity.persistentData.putBoolean(ACTIVE, true)
+        blockEntity.setChanged()
+        if (reconcileNow) reconcileBlockInventory(blockEntity, force = true)
+    }
+
+    fun isActivated(blockEntity: BlockEntity): Boolean = blockEntity.persistentData.getBoolean(ACTIVE)
+
+    private fun reconcileBlockInventory(blockEntity: BlockEntity, force: Boolean) {
+        val level = blockEntity.level ?: return
+        if (level.isClientSide || blockEntity.isRemoved || reconciling.get()) return
+        val before = inventoryFingerprint(blockEntity)
+        if (!force && inventoryFingerprints[blockEntity] == before) return
+        if (before == 0) {
+            inventoryFingerprints[blockEntity] = before
+            return
         }
-        synchronized(tracked) { removed.forEach(tracked::remove) }
-    }
-
-    /** Public for GameTests and for inventories placed after their chunk has loaded. */
-    fun trackInventory(level: ServerLevel, blockEntity: BlockEntity) {
-        if (isInventory(blockEntity)) trackedInventories(level).let { tracked ->
-            synchronized(tracked) { tracked.add(blockEntity.blockPos.asLong()) }
+        reconciling.set(true)
+        try {
+            tickBlockInventory(level, blockEntity, level.gameTime)
+            inventoryFingerprints[blockEntity] = inventoryFingerprint(blockEntity)
+        } finally {
+            reconciling.set(false)
         }
     }
 
@@ -332,12 +297,15 @@ object FoodThermalService {
             tickContainer(level, blockEntity.blockPos, blockEntity, gameTime)
             return
         }
-        val target = containerTarget(level, blockEntity.blockPos)
         blockEntity.getCapability(ForgeCapabilities.ITEM_HANDLER).ifPresent { handler ->
             val writable = handler as? IItemHandlerModifiable ?: return@ifPresent
-            for (slot in 0 until writable.slots) {
+            val foodSlots = (0 until writable.slots).filter { isTrackedFood(writable.getStackInSlot(it)) }
+            if (foodSlots.isEmpty()) return@ifPresent
+            val target = containerTarget(level, blockEntity.blockPos)
+            foodSlots.forEach { slot ->
                 val stack = writable.getStackInSlot(slot)
-                if (stack.isEdible) writable.setStackInSlot(slot, tick(stack, target.temperatureK, gameTime, target.appliance))
+                val effective = target ?: storedTarget(stack)
+                writable.setStackInSlot(slot, tick(stack, effective.temperatureK, gameTime, effective.appliance))
             }
         }
     }
@@ -345,13 +313,70 @@ object FoodThermalService {
     private fun isInventory(blockEntity: BlockEntity): Boolean =
         blockEntity is Container || blockEntity.getCapability(ForgeCapabilities.ITEM_HANDLER).isPresent
 
-    private fun trackedInventories(level: ServerLevel): LongOpenHashSet =
-        trackedInventoryPositionsByLevel.computeIfAbsent(level.dimension()) { LongOpenHashSet() }
+    private fun inventoryFingerprint(blockEntity: BlockEntity): Int {
+        var result = 1
+        var found = false
+        fun add(slot: Int, stack: ItemStack) {
+            if (!isTrackedFood(stack)) return
+            found = true
+            result = 31 * result + slot
+            result = 31 * result + stack.item.hashCode()
+            result = 31 * result + stack.count
+            result = 31 * result + (stack.tag?.hashCode() ?: 0)
+        }
+        if (blockEntity is Container) {
+            (0 until blockEntity.containerSize).forEach { add(it, blockEntity.getItem(it)) }
+        } else {
+            blockEntity.getCapability(ForgeCapabilities.ITEM_HANDLER).ifPresent { handler ->
+                (0 until handler.slots).forEach { add(it, handler.getStackInSlot(it)) }
+            }
+        }
+        return if (found) result else 0
+    }
+
+    private fun storedTarget(stack: ItemStack): ContainerTarget {
+        val tag = stack.tag?.getCompound(KEY)
+        return if (tag != null && tag.getInt(VERSION) == CURRENT_VERSION) {
+            ContainerTarget(kelvinForBucket(tag.getInt(LAST_TARGET_BUCKET)), tag.getBoolean(LAST_TARGET_APPLIANCE))
+        } else ContainerTarget(295.15, false)
+    }
+
+    private fun isTrackedFood(stack: ItemStack): Boolean = stack.isEdible &&
+        stack.item != FoodItems.SPOILED_MEAT.get() && stack.item != FoodItems.SPOILED_PRODUCE.get()
+
+    @JvmStatic
+    fun onPlayerInventoryChanged(player: Player) {
+        if (player is ServerPlayer) reconcilePlayerInventory(player, force = false)
+    }
+
+    private fun reconcilePlayerInventory(player: ServerPlayer, force: Boolean) {
+        if (reconciling.get()) return
+        val inventories = listOf(player.inventory.items, player.inventory.armor, player.inventory.offhand)
+        val before = inventories.flatten().fold(1) { hash, stack ->
+            if (isTrackedFood(stack)) 31 * hash + stack.item.hashCode() + 31 * stack.count + (stack.tag?.hashCode() ?: 0) else hash
+        }
+        if (!force && playerInventoryFingerprints[player] == before) return
+        reconciling.set(true)
+        try {
+            val target = ambient(player)
+            inventories.forEach { inventory ->
+                inventory.indices.forEach { slot ->
+                    if (isTrackedFood(inventory[slot])) inventory[slot] = tick(inventory[slot], target, player.level().gameTime)
+                }
+            }
+            playerInventoryFingerprints[player] = inventories.flatten().fold(1) { hash, stack ->
+                if (isTrackedFood(stack)) 31 * hash + stack.item.hashCode() + 31 * stack.count + (stack.tag?.hashCode() ?: 0) else hash
+            }
+        } finally {
+            reconciling.set(false)
+        }
+    }
 
     @SubscribeEvent
     fun onUseStart(event: LivingEntityUseItemEvent.Start) {
         val stack = event.item
         if (!stack.isEdible) return
+        (event.entity as? ServerPlayer)?.let { reconcilePlayerInventory(it, force = true) }
         if (isFrozen(stack)) event.isCanceled = true
     }
 
