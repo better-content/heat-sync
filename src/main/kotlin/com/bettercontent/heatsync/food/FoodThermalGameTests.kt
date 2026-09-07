@@ -6,6 +6,7 @@ import com.bettercontent.heatsync.content.heat.ConstantTemperatureBlockEntity
 import net.minecraft.core.BlockPos
 import net.minecraft.gametest.framework.GameTest
 import net.minecraft.gametest.framework.GameTestHelper
+import net.minecraft.nbt.CompoundTag
 import net.minecraft.world.item.ItemStack
 import net.minecraft.world.item.Items
 import net.minecraft.world.level.block.Blocks
@@ -13,6 +14,7 @@ import net.minecraft.world.level.block.entity.BarrelBlockEntity
 import net.minecraft.world.level.block.entity.ChestBlockEntity
 import net.minecraftforge.gametest.GameTestHolder
 import net.minecraftforge.gametest.PrefixGameTestTemplate
+import net.minecraftforge.registries.ForgeRegistries
 
 @GameTestHolder(HeatSyncMod.MOD_ID)
 @PrefixGameTestTemplate(false)
@@ -121,17 +123,63 @@ class FoodThermalGameTests {
         }
     }
 
-    private fun thermalState(stack: ItemStack, temperature: Double) {
+    @GameTest(template = "coolant_exchanger", timeoutTicks = 20)
+    fun weightedMergePreservesOrdinaryIdentityAndNonThermalData(helper: GameTestHelper) {
+        val destination = ItemStack(Items.APPLE, 3)
+        destination.orCreateTag.putString("better_content_quality", "orchard")
+        destination.orCreateTag.put("better_content_details", CompoundTag().also { it.putInt("grade", 2) })
+        thermalState(destination, temperature = 273.15, decay = 0.2, lastTime = 100)
+
+        val source = destination.copy().also {
+            it.count = 2
+            thermalState(it, temperature = 373.15, decay = 0.8, lastTime = 100)
+        }
+        val sourceBefore = source.copy()
+        val destinationNonThermal = withoutThermalState(destination)
+        val destinationThermal = destination.tag!!.getCompound("heat_sync_food").copy()
+        val output = destination.copy()
+
+        FoodStackMergeService.mergeInto(output, destination, source, movedCount = 1)
+
+        helper.succeedIf {
+            helper.assertTrue(
+                ForgeRegistries.ITEMS.getKey(output.item).toString() == "minecraft:apple",
+                "A weighted merge must retain the ordinary destination item ID",
+            )
+            helper.assertTrue(
+                withoutThermalState(output) == destinationNonThermal,
+                "A weighted merge must leave every non-thermal NBT value unchanged",
+            )
+            helper.assertTrue(
+                ItemStack.matches(source, sourceBefore),
+                "Computing a partial merge must not mutate the source remainder",
+            )
+            helper.assertTrue(
+                output.tag!!.getCompound("heat_sync_food") != destinationThermal,
+                "A weighted merge must recompute only heat_sync_food",
+            )
+        }
+    }
+
+    private fun thermalState(
+        stack: ItemStack,
+        temperature: Double,
+        decay: Double = 0.0,
+        lastTime: Long = 0,
+    ) {
         val state = stack.orCreateTag.getCompound("heat_sync_food")
         val bucket = kotlin.math.round((temperature - 273.15) / 5.0).toInt()
         state.putInt("version", 3)
         state.putInt("temperature_bucket_c", bucket)
         state.putInt("last_target_bucket_c", bucket)
         state.putBoolean("last_target_appliance", false)
-        state.putDouble("decay", 0.0)
-        state.putLong("last_time", 0)
+        state.putDouble("decay", decay)
+        state.putLong("last_time", lastTime)
         stack.orCreateTag.put("heat_sync_food", state)
     }
+
+    private fun withoutThermalState(stack: ItemStack): CompoundTag? =
+        stack.tag?.copy()?.also { it.remove("heat_sync_food") }?.takeUnless { it.isEmpty }
 
     private fun decay(stack: ItemStack): Double = stack.tag!!.getCompound("heat_sync_food").getDouble("decay")
 }

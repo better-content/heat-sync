@@ -10,6 +10,7 @@ Heat Sync is a Minecraft `1.20.1` Forge mod built with Kotlin. It owns native he
 - Uses the configured neutral heat baseline as ambient when Cold Sweat is absent; native heat transport remains available.
 - Ships default tags under `data/heat_sync/tags/blocks` for radiator and cold-source classification.
 - Provides native heat pipes, coolant exchangers, thermal fireboxes, boiler heaters, and creative heat sources without a Create: New Age dependency.
+- Allows otherwise-identical food stacks with different thermal/spoilage state to merge across vanilla inventories, item entities, hoppers, and standard Forge item handlers. Temperature and decay are weighted by the destination count plus the number actually moved; the destination item identity and every non-thermal tag remain unchanged.
 
 ## Configuration
 
@@ -63,6 +64,7 @@ Coverage outputs:
 ## Notes
 
 - Cold Sweat is optional. `verifyFull` runs the headless GameTests once with Cold Sweat `2.4` and once without Cold Sweat.
+- Merge compatibility ignores only the root `heat_sync_food` tag. Damage, capabilities, and all other NBT must still match, and partial transfers leave the source remainder unchanged.
 - Development dependencies are resolved from Forge, Create, Modrinth, Curse Maven, and Kotlin for Forge repositories declared in `build.gradle.kts`.
 
 ## Community and support
