@@ -65,6 +65,7 @@ Coverage outputs:
 
 - Cold Sweat is optional. `verifyFull` runs the headless GameTests once with Cold Sweat `2.4` and once without Cold Sweat.
 - Merge compatibility ignores only the root `heat_sync_food` tag. Damage, capabilities, and all other NBT must still match, and partial transfers leave the source remainder unchanged.
+- When Better Content Threads is present, an attempted use of observably frozen food begins one correlated episode; successfully consuming the same ordinary item identity after it is thawed and fresh completes that episode.
 - Development dependencies are resolved from Forge, Create, Modrinth, Curse Maven, and Kotlin for Forge repositories declared in `build.gradle.kts`.
 
 ## Community and support
