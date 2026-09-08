@@ -271,10 +271,12 @@ dependencies {
     runtimeOnly(deobf("curse.maven:emi-580555:$emiCurseFileId"))
     compileOnly(deobf("maven.modrinth:power-grid:$powerGridVersion"))
     compileOnly(deobf("curse.maven:pneumaticcraft-repressurized-281849:$pneumaticCraftCurseFileId"))
+    runtimeOnly(deobf("curse.maven:pneumaticcraft-repressurized-281849:$pneumaticCraftCurseFileId"))
     compileOnly(deobf("curse.maven:applied-energistics-2-223794:$ae2CurseFileId"))
 
     testImplementation(kotlin("test"))
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
+    testImplementation(deobf("curse.maven:pneumaticcraft-repressurized-281849:$pneumaticCraftCurseFileId"))
 }
 
 tasks.processResources {

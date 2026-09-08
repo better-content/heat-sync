@@ -1,8 +1,9 @@
 package com.bettercontent.heatsync.compat.pneumaticcraft
 
 import com.bettercontent.heatsync.HeatSyncMod
+import com.bettercontent.heatsync.api.HeatBlockEntity
+import com.bettercontent.heatsync.api.HeatStorageThermalBody
 import com.bettercontent.heatsync.api.IThermalBody
-import com.bettercontent.heatsync.api.ThermalCapabilities
 import me.desht.pneumaticcraft.api.PNCCapabilities
 import me.desht.pneumaticcraft.api.heat.IHeatExchangerLogic
 import net.minecraft.core.BlockPos
@@ -19,7 +20,7 @@ import net.minecraftforge.eventbus.api.IEventBus
 import java.util.function.BiPredicate
 import kotlin.math.roundToInt
 
-/** Exposes every HeatSync storage as a conservative PneumaticCraft thermal body. */
+/** Exposes Heat Sync block entities as conservative PneumaticCraft thermal bodies. */
 object PneumaticHeatBridge {
     const val MOD_ID = "pneumaticcraft"
     private val ID = ResourceLocation.fromNamespaceAndPath(HeatSyncMod.MOD_ID, "pneumatic_heat")
@@ -28,19 +29,18 @@ object PneumaticHeatBridge {
         forgeBus.addGenericListener(BlockEntity::class.java, ::attachCapabilities)
     }
 
-    private fun attachCapabilities(event: AttachCapabilitiesEvent<BlockEntity>) {
-        val heat = event.`object`.getCapability(ThermalCapabilities.BODY)
-        if (!heat.isPresent) return
-        val provider = PneumaticHeatProvider(heat)
+    internal fun attachCapabilities(event: AttachCapabilitiesEvent<BlockEntity>) {
+        val heat = event.`object` as? HeatBlockEntity ?: return
+        val provider = PneumaticHeatProvider(HeatStorageThermalBody(heat))
         event.addCapability(ID, provider)
         event.addListener(provider::invalidate)
     }
 
     private class PneumaticHeatProvider(
-        private val heat: LazyOptional<IThermalBody>,
+        heat: IThermalBody,
     ) : ICapabilityProvider {
         private val logic: LazyOptional<IHeatExchangerLogic> = LazyOptional.of {
-            HeatSyncPneumaticLogic { heat.orElseThrow { IllegalStateException("HeatSync thermal capability invalidated") } }
+            HeatSyncPneumaticLogic(heat)
         }
 
         override fun <T : Any> getCapability(cap: Capability<T>, side: Direction?): LazyOptional<T> =
@@ -51,8 +51,8 @@ object PneumaticHeatBridge {
         }
     }
 
-    private class HeatSyncPneumaticLogic(
-        private val storage: () -> IThermalBody,
+    internal class HeatSyncPneumaticLogic(
+        private val storage: IThermalBody,
     ) : IHeatExchangerLogic {
         private var thermalResistance = 1.0
         private var thermalCapacity = 1.0
@@ -69,10 +69,10 @@ object PneumaticHeatBridge {
         override fun initializeAmbientTemperature(level: Level, pos: BlockPos) = Unit
 
         override fun setTemperature(temperature: Double) {
-            storage().setTemperatureKelvin(temperature)
+            storage.setTemperatureKelvin(temperature)
         }
 
-        override fun getTemperature(): Double = storage().temperatureKelvin()
+        override fun getTemperature(): Double = storage.temperatureKelvin()
 
         override fun getTemperatureAsInt(): Int = temperature.roundToInt()
 
@@ -83,23 +83,23 @@ object PneumaticHeatBridge {
         }
 
         override fun getThermalResistance(): Double =
-            maxOf(thermalResistance, 1.0 / storage().conductanceHUPerKTick(null).coerceAtLeast(0.0001))
+            maxOf(thermalResistance, 1.0 / storage.conductanceHUPerKTick(null).coerceAtLeast(0.0001))
 
         override fun setThermalCapacity(capacity: Double) {
             thermalCapacity = capacity.coerceAtLeast(0.0001)
         }
 
         override fun getThermalCapacity(): Double =
-            maxOf(thermalCapacity, storage().heatCapacityHUPerK())
+            maxOf(thermalCapacity, storage.heatCapacityHUPerK())
 
         override fun addHeat(amount: Double) {
             if (amount > 0) {
-                storage().insertHeatHU(amount)
+                storage.insertHeatHU(amount)
             } else if (amount < 0) {
-                storage().extractHeatHU(-amount)
+                storage.extractHeatHU(-amount)
             }
         }
 
-        override fun isSideConnected(side: Direction): Boolean = storage().canConnect(side)
+        override fun isSideConnected(side: Direction): Boolean = storage.canConnect(side)
     }
 }
