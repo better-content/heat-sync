@@ -379,7 +379,7 @@ object FoodThermalService {
         val player = event.entity as? ServerPlayer
         player?.let { reconcilePlayerInventory(it, force = true) }
         if (isFrozen(stack)) {
-            player?.let { FoodThreadEpisodes.onFrozenUseRejected(it, stack) }
+            player?.let { FoodThermalEpisodes.onFrozenUseRejected(it, stack) }
             event.isCanceled = true
         }
     }
@@ -388,7 +388,7 @@ object FoodThermalService {
     fun onUseFinish(event: LivingEntityUseItemEvent.Finish) {
         val player = event.entity as? ServerPlayer ?: return
         val current = event.item
-        FoodThreadEpisodes.onFoodUseFinished(player, current)
+        FoodThermalEpisodes.onFoodUseFinished(player, current)
         val stage = if (current.item == FoodItems.SPOILED_MEAT.get() || current.item == FoodItems.SPOILED_PRODUCE.get()) Stage.ROTTEN else stage(current)
         val amplifier = when (stage) { Stage.STALE -> 0; Stage.SPOILED -> 1; Stage.ROTTEN, Stage.CONVERTED -> 2; else -> return }
         val duration = debuffDurationTicks(stage)

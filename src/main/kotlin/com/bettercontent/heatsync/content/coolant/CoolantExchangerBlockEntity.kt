@@ -1,5 +1,7 @@
 package com.bettercontent.heatsync.content.coolant
 
+import com.bettercontent.heatsync.api.event.CoolantSafetyEvent
+
 import com.bettercontent.heatsync.HeatSyncRegistries
 import com.bettercontent.heatsync.api.HeatBlockEntity
 import com.bettercontent.heatsync.api.HeatCapabilities
@@ -35,8 +37,8 @@ class CoolantExchangerBlockEntity(
     IHaveGoggleInformation {
     private var heat: Float = 0f
     private var tickCounter: Long = 0L
-    private var threadEpisode: String? = null
-    private var threadPlayer: UUID? = null
+    private var safetyEpisode: String? = null
+    private var safetyPlayer: UUID? = null
 
     private val tank = object : FluidTank(TANK_CAPACITY) {
         override fun isFluidValid(stack: FluidStack): Boolean {
@@ -57,8 +59,8 @@ class CoolantExchangerBlockEntity(
         super.load(tag)
         heat = tag.getFloat(HEAT_KEY).coerceAtLeast(ABSOLUTE_ZERO)
         tickCounter = tag.getLong(TICK_KEY)
-        threadEpisode = tag.getString(THREAD_EPISODE_KEY).takeIf { it.isNotBlank() }
-        threadPlayer = if (tag.hasUUID(THREAD_PLAYER_KEY)) tag.getUUID(THREAD_PLAYER_KEY) else null
+        safetyEpisode = tag.getString(LEGACY_EPISODE_KEY).takeIf { it.isNotBlank() }
+        safetyPlayer = if (tag.hasUUID(LEGACY_PLAYER_KEY)) tag.getUUID(LEGACY_PLAYER_KEY) else null
         tank.readFromNBT(tag.getCompound(TANK_KEY))
     }
 
@@ -66,8 +68,8 @@ class CoolantExchangerBlockEntity(
         super.saveAdditional(tag)
         tag.putFloat(HEAT_KEY, heat)
         tag.putLong(TICK_KEY, tickCounter)
-        threadEpisode?.let { tag.putString(THREAD_EPISODE_KEY, it) }
-        threadPlayer?.let { tag.putUUID(THREAD_PLAYER_KEY, it) }
+        safetyEpisode?.let { tag.putString(LEGACY_EPISODE_KEY, it) }
+        safetyPlayer?.let { tag.putUUID(LEGACY_PLAYER_KEY, it) }
         tag.put(TANK_KEY, tank.writeToNBT(CompoundTag()))
     }
 
@@ -147,7 +149,7 @@ class CoolantExchangerBlockEntity(
         val convertedAfterTransfer = if (convertedBeforeTransfer) false else processFluid()
         val buffered = clampWorkingHeat()
         val changed = convertedBeforeTransfer || convertedAfterTransfer || buffered
-        updateThreadEpisode(convertedBeforeTransfer || convertedAfterTransfer)
+        updateSafetyEpisode(convertedBeforeTransfer || convertedAfterTransfer)
 
         if (tickCounter % NETWORK_TRANSFER_INTERVAL == 0L) {
             if (!canSpendHeatIntoFluidThisTick(convertedBeforeTransfer || convertedAfterTransfer)) {
@@ -159,22 +161,24 @@ class CoolantExchangerBlockEntity(
         }
     }
 
-    private fun updateThreadEpisode(converted: Boolean) {
+    private fun updateSafetyEpisode(converted: Boolean) {
         val serverLevel = level as? net.minecraft.server.level.ServerLevel ?: return
-        if (heat > INTERNAL_HEAT_BUFFER && threadEpisode == null) {
+        if (heat > INTERNAL_HEAT_BUFFER && safetyEpisode == null) {
             val player = serverLevel.getNearestPlayer(blockPos.x + .5, blockPos.y + .5, blockPos.z + .5, 16.0, false) as? ServerPlayer ?: return
-            threadEpisode = "${player.uuid}:heat:${blockPos.asLong()}:${serverLevel.gameTime}"
-            threadPlayer = player.uuid
-            emit(player, "heat_excess", "network", threadEpisode!!)
+            safetyEpisode = "${player.uuid}:heat:${blockPos.asLong()}:${serverLevel.gameTime}"
+            safetyPlayer = player.uuid
+            net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(CoolantSafetyEvent(
+                player, blockPos, safetyEpisode!!, CoolantSafetyEvent.Stage.EXCESS_HEAT_OBSERVED,
+            ))
             setChanged()
-        } else if (converted && heat <= INTERNAL_HEAT_BUFFER && threadEpisode != null && threadPlayer != null) {
-            val player = serverLevel.server.playerList.getPlayer(threadPlayer!!) ?: return
-            emit(player, "heat_safe", "safe", threadEpisode!!)
-            threadEpisode = null;threadPlayer = null;setChanged()
+        } else if (converted && heat <= INTERNAL_HEAT_BUFFER && safetyEpisode != null && safetyPlayer != null) {
+            val player = serverLevel.server.playerList.getPlayer(safetyPlayer!!) ?: return
+            net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(CoolantSafetyEvent(
+                player, blockPos, safetyEpisode!!, CoolantSafetyEvent.Stage.SAFE_AFTER_COOLANT_EXCHANGE,
+            ))
+            safetyEpisode = null;safetyPlayer = null;setChanged()
         }
     }
-
-    private fun emit(player: ServerPlayer,type: String,value: String,token: String) { try { Class.forName("com.bettercontent.threads.api.ThreadSignals").getMethod("emit",ServerPlayer::class.java,String::class.java,String::class.java,String::class.java).invoke(null,player,type,value,token) } catch (_: ReflectiveOperationException) {} }
 
     private fun processFluid(): Boolean {
         val stack = tank.fluid
@@ -251,8 +255,9 @@ class CoolantExchangerBlockEntity(
         private const val HEAT_KEY = "Heat"
         private const val TANK_KEY = "Tank"
         private const val TICK_KEY = "TickCounter"
-        private const val THREAD_EPISODE_KEY = "ThreadHeatEpisode"
-        private const val THREAD_PLAYER_KEY = "ThreadHeatPlayer"
+        // Keep legacy NBT names so coolant-safety episodes already in progress survive the migration.
+        private const val LEGACY_EPISODE_KEY = "ThreadHeatEpisode"
+        private const val LEGACY_PLAYER_KEY = "ThreadHeatPlayer"
 
         @JvmStatic
         @Suppress("UNUSED_PARAMETER")

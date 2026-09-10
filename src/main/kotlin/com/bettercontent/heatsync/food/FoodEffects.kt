@@ -1,6 +1,8 @@
 package com.bettercontent.heatsync.food
 
 import com.bettercontent.heatsync.HeatSyncMod
+import com.illusivesoulworks.diet.platform.Services
+import dev.ghen.thirst.foundation.common.capability.ModCapabilities
 import net.minecraft.world.effect.MobEffect
 import net.minecraft.world.effect.MobEffectCategory
 import net.minecraft.world.entity.LivingEntity
@@ -10,6 +12,7 @@ import net.minecraft.world.food.FoodProperties
 import net.minecraftforge.registries.DeferredRegister
 import net.minecraftforge.registries.ForgeRegistries
 import net.minecraftforge.registries.RegistryObject
+import net.minecraftforge.fml.ModList
 
 object FoodEffects {
     val EFFECTS: DeferredRegister<MobEffect> = DeferredRegister.create(ForgeRegistries.MOB_EFFECTS, HeatSyncMod.MOD_ID)
@@ -35,38 +38,29 @@ private object ThirstBridge {
     private val pendingLoss = mutableMapOf<java.util.UUID, Double>()
 
     fun drain(player: Player, amplifier: Int) {
-        runCatching {
-            val caps = Class.forName("dev.ghen.thirst.foundation.common.capability.ModCapabilities")
-            val capability = caps.getField("PLAYER_THIRST").get(null)
-            val lazy = player.javaClass.getMethod("getCapability", Class.forName("net.minecraftforge.common.capabilities.Capability")).invoke(player, capability)
-            lazy.javaClass.getMethod("ifPresent", java.util.function.Consumer::class.java).invoke(lazy, java.util.function.Consumer<Any> { thirst ->
-                val now = thirst.javaClass.getMethod("getThirst").invoke(thirst) as Int
-                val quenched = thirst.javaClass.getMethod("getQuenched").invoke(thirst) as Int
-                val loss = doubleArrayOf(2.0, 4.0, 6.0)[amplifier.coerceIn(0, 2)] / 60.0
-                val accumulated = (pendingLoss[player.uuid] ?: 0.0) + loss
-                val whole = accumulated.toInt()
-                pendingLoss[player.uuid] = accumulated - whole
-                val next = (now - whole).coerceAtLeast(0)
-                thirst.javaClass.getMethod("setThirst", Int::class.javaPrimitiveType).invoke(thirst, next)
-                thirst.javaClass.getMethod("setQuenched", Int::class.javaPrimitiveType).invoke(thirst, quenched.coerceAtMost(next))
-                thirst.javaClass.getMethod("updateThirstData", Player::class.java).invoke(thirst, player)
-            })
+        if (!ModList.get().isLoaded("thirst")) return
+        player.getCapability(ModCapabilities.PLAYER_THIRST).ifPresent { thirst ->
+            val now = thirst.thirst
+            val quenched = thirst.quenched
+            val loss = doubleArrayOf(2.0, 4.0, 6.0)[amplifier.coerceIn(0, 2)] / 60.0
+            val accumulated = (pendingLoss[player.uuid] ?: 0.0) + loss
+            val whole = accumulated.toInt()
+            pendingLoss[player.uuid] = accumulated - whole
+            val next = (now - whole).coerceAtLeast(0)
+            thirst.thirst = next
+            thirst.quenched = quenched.coerceAtMost(next)
+            thirst.updateThirstData(player)
         }
     }
 }
 
 private object DietBridge {
     fun drain(player: Player, amplifier: Int) {
-        runCatching {
-            val services = Class.forName("com.illusivesoulworks.diet.platform.Services")
-            val capabilityService = services.getField("CAPABILITY").get(null)
-            val optional = capabilityService.javaClass.getMethod("get", Player::class.java).invoke(capabilityService, player) as java.util.Optional<*>
-            optional.ifPresent { tracker ->
-                val total = doubleArrayOf(0.02, 0.06, 0.10)[amplifier.coerceIn(0, 2)] / 60.0
-                val values = tracker.javaClass.getMethod("getValues").invoke(tracker) as Map<*, *>
-                values.forEach { (key, value) -> tracker.javaClass.getMethod("setValue", String::class.java, Float::class.javaPrimitiveType).invoke(tracker, key as String, ((value as Float) - total.toFloat()).coerceAtLeast(0f)) }
-                tracker.javaClass.getMethod("sync").invoke(tracker)
-            }
+        if (!ModList.get().isLoaded("diet")) return
+        Services.CAPABILITY.get(player).ifPresent { tracker ->
+            val total = doubleArrayOf(0.02, 0.06, 0.10)[amplifier.coerceIn(0, 2)] / 60.0
+            tracker.values.forEach { (key, value) -> tracker.setValue(key, (value - total.toFloat()).coerceAtLeast(0f)) }
+            tracker.sync()
         }
     }
 }

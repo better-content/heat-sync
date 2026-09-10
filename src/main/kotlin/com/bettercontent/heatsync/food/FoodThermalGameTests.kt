@@ -172,16 +172,16 @@ class FoodThermalGameTests {
         }
 
         helper.succeedIf {
-            helper.assertTrue(FoodThreadEpisodes.isNonNeutral(frozenApple), "Frozen edible use must reveal a non-neutral episode")
-            helper.assertTrue(!FoodThreadEpisodes.isAppropriate(frozenApple), "Frozen food is not appropriate to consume")
-            helper.assertTrue(FoodThreadEpisodes.isAppropriate(thawedApple), "Thawed fresh food is appropriate to consume")
-            helper.assertTrue(!FoodThreadEpisodes.isAppropriate(staleApple), "Stale food is not an appropriate completion")
+            helper.assertTrue(FoodThermalEpisodes.isNonNeutral(frozenApple), "Frozen edible use must reveal a non-neutral episode")
+            helper.assertTrue(!FoodThermalEpisodes.isAppropriate(frozenApple), "Frozen food is not appropriate to consume")
+            helper.assertTrue(FoodThermalEpisodes.isAppropriate(thawedApple), "Thawed fresh food is appropriate to consume")
+            helper.assertTrue(!FoodThermalEpisodes.isAppropriate(staleApple), "Stale food is not an appropriate completion")
             helper.assertTrue(
-                FoodThreadEpisodes.sameOrdinaryItem("minecraft:apple", thawedApple),
+                FoodThermalEpisodes.sameOrdinaryItem("minecraft:apple", thawedApple),
                 "Completion must retain the reveal episode's ordinary item identity",
             )
             helper.assertTrue(
-                !FoodThreadEpisodes.sameOrdinaryItem("minecraft:carrot", thawedApple),
+                !FoodThermalEpisodes.sameOrdinaryItem("minecraft:carrot", thawedApple),
                 "A different ordinary item identity must not complete the episode",
             )
         }
