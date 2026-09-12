@@ -5,6 +5,8 @@
   "refmap": "heat_sync.refmap.json",
   "compatibilityLevel": "JAVA_17",
   "mixins": [
+    "create.BlastingTypeMixin",
+    "create.BoilerHeatersMixin",
     "forge.ItemHandlerHelperMixin",
     "forge.ItemStackHandlerMixin",
     "forge.InvWrapperMixin",
@@ -14,6 +16,9 @@
     "minecraft.InventoryMixin",
     "minecraft.ItemEntityMixin",
     "minecraft.SlotMixin"
+  ],
+  "client": [
+    "create.client.FanScenesMixin"
   ],
   "injectors": {
     "defaultRequire": 1

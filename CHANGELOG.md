@@ -19,3 +19,4 @@ All notable changes to this project are documented in this file.
 - Allow otherwise-identical food stacks with different thermal state to merge, recomputing temperature and decay by item-count-weighted averaging while preserving the ordinary item identity and all non-thermal data.
 - Emit optional correlated Threads evidence when frozen food is rejected and the same ordinary item is later consumed thawed and fresh.
 - Keep spoiled-food Thirst and Diet drains server-authoritative, preventing client-side capability mutation and a Thirst sync crash.
+- Require actively fueled Blaze Burners for Create boiler heat and bulk blasting; passive heaters and lava blasting no longer provide infinite heat.
