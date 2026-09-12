@@ -23,7 +23,7 @@ class HeatSyncPonderPlugin : PonderPlugin {
         helper.registerTag(HEAT_MANAGEMENT)
             .item(HeatSyncRegistries.COOLANT_EXCHANGER.get())
             .title("Heat Management")
-            .description("Moving Heat Sync heat into and out of useful fluid states")
+            .description("Heating and cooling fluids")
             .addToIndex()
             .register()
 
