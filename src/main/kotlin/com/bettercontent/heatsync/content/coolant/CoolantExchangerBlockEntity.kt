@@ -39,6 +39,9 @@ class CoolantExchangerBlockEntity(
     private var tickCounter: Long = 0L
     private var safetyEpisode: String? = null
     private var safetyPlayer: UUID? = null
+    private var operator: UUID? = null
+
+    fun configuredBy(player: UUID) { operator = player; setChanged() }
 
     private val tank = object : FluidTank(TANK_CAPACITY) {
         override fun isFluidValid(stack: FluidStack): Boolean {
@@ -59,8 +62,9 @@ class CoolantExchangerBlockEntity(
         super.load(tag)
         heat = tag.getFloat(HEAT_KEY).coerceAtLeast(ABSOLUTE_ZERO)
         tickCounter = tag.getLong(TICK_KEY)
-        safetyEpisode = tag.getString(LEGACY_EPISODE_KEY).takeIf { it.isNotBlank() }
-        safetyPlayer = if (tag.hasUUID(LEGACY_PLAYER_KEY)) tag.getUUID(LEGACY_PLAYER_KEY) else null
+        operator = if (tag.hasUUID(OPERATOR_KEY)) tag.getUUID(OPERATOR_KEY) else null
+        safetyEpisode = tag.getString(EPISODE_KEY).takeIf { it.isNotBlank() }
+        safetyPlayer = if (tag.hasUUID(PLAYER_KEY)) tag.getUUID(PLAYER_KEY) else null
         tank.readFromNBT(tag.getCompound(TANK_KEY))
     }
 
@@ -68,8 +72,9 @@ class CoolantExchangerBlockEntity(
         super.saveAdditional(tag)
         tag.putFloat(HEAT_KEY, heat)
         tag.putLong(TICK_KEY, tickCounter)
-        safetyEpisode?.let { tag.putString(LEGACY_EPISODE_KEY, it) }
-        safetyPlayer?.let { tag.putUUID(LEGACY_PLAYER_KEY, it) }
+        operator?.let { tag.putUUID(OPERATOR_KEY, it) }
+        safetyEpisode?.let { tag.putString(EPISODE_KEY, it) }
+        safetyPlayer?.let { tag.putUUID(PLAYER_KEY, it) }
         tag.put(TANK_KEY, tank.writeToNBT(CompoundTag()))
     }
 
@@ -140,6 +145,7 @@ class CoolantExchangerBlockEntity(
 
     private fun serverTick() {
         tickCounter++
+        updateSafetyEpisode(false)
         val convertedBeforeTransfer = processFluid()
 
         if (tickCounter % NETWORK_TRANSFER_INTERVAL == 0L) {
@@ -164,19 +170,24 @@ class CoolantExchangerBlockEntity(
     private fun updateSafetyEpisode(converted: Boolean) {
         val serverLevel = level as? net.minecraft.server.level.ServerLevel ?: return
         if (heat > INTERNAL_HEAT_BUFFER && safetyEpisode == null) {
-            val player = serverLevel.getNearestPlayer(blockPos.x + .5, blockPos.y + .5, blockPos.z + .5, 16.0, false) as? ServerPlayer ?: return
-            safetyEpisode = "${player.uuid}:heat:${blockPos.asLong()}:${serverLevel.gameTime}"
-            safetyPlayer = player.uuid
-            net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(CoolantSafetyEvent(
-                player, blockPos, safetyEpisode!!, CoolantSafetyEvent.Stage.EXCESS_HEAT_OBSERVED,
-            ))
+            val owner = operator ?: return
+            safetyEpisode = "$owner:heat:${blockPos.asLong()}:${serverLevel.gameTime}"
+            safetyPlayer = owner
+            serverLevel.server.playerList.getPlayer(owner)?.let { player ->
+                net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(CoolantSafetyEvent(
+                    player, blockPos, safetyEpisode!!, CoolantSafetyEvent.Stage.EXCESS_HEAT_OBSERVED,
+                ))
+            }
             setChanged()
         } else if (converted && heat <= INTERNAL_HEAT_BUFFER && safetyEpisode != null && safetyPlayer != null) {
-            val player = serverLevel.server.playerList.getPlayer(safetyPlayer!!) ?: return
-            net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(CoolantSafetyEvent(
-                player, blockPos, safetyEpisode!!, CoolantSafetyEvent.Stage.SAFE_AFTER_COOLANT_EXCHANGE,
-            ))
-            safetyEpisode = null;safetyPlayer = null;setChanged()
+            net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(
+                com.bettercontent.heatsync.api.event.CoolantRecoveryEvent(serverLevel, safetyPlayer!!, blockPos, safetyEpisode!!))
+            serverLevel.server.playerList.getPlayer(safetyPlayer!!)?.let { player ->
+                net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(CoolantSafetyEvent(
+                    player, blockPos, safetyEpisode!!, CoolantSafetyEvent.Stage.SAFE_AFTER_COOLANT_EXCHANGE,
+                ))
+            }
+            safetyEpisode = null; safetyPlayer = null; setChanged()
         }
     }
 
@@ -255,9 +266,10 @@ class CoolantExchangerBlockEntity(
         private const val HEAT_KEY = "Heat"
         private const val TANK_KEY = "Tank"
         private const val TICK_KEY = "TickCounter"
-        // Keep legacy NBT names so coolant-safety episodes already in progress survive the migration.
-        private const val LEGACY_EPISODE_KEY = "ThreadHeatEpisode"
-        private const val LEGACY_PLAYER_KEY = "ThreadHeatPlayer"
+        // Older nearest-observer episodes cannot establish ownership and are intentionally ignored.
+        private const val OPERATOR_KEY = "CoolantOperator"
+        private const val EPISODE_KEY = "CoolantSafetyEpisode"
+        private const val PLAYER_KEY = "CoolantSafetyOwner"
 
         @JvmStatic
         @Suppress("UNUSED_PARAMETER")

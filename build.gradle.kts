@@ -452,3 +452,7 @@ tasks.register("verifyFull") {
     dependsOn(tasks.named("headlessGameTest"))
     dependsOn(headlessGameTestNoColdSweat)
 }
+
+// Mixin's reobfuscation mappings are produced by the Java annotation processor.
+// A partial compile can discard that file without revisiting the mixin source.
+tasks.withType<JavaCompile>().configureEach { options.isIncremental = false }

@@ -44,6 +44,13 @@ class CoolantExchangerBlock : BaseEntityBlock(
         )
     }
 
+    override fun setPlacedBy(level: Level, pos: BlockPos, state: BlockState,
+        placer: net.minecraft.world.entity.LivingEntity?, stack: net.minecraft.world.item.ItemStack) {
+        super.setPlacedBy(level, pos, state, placer, stack)
+        if (placer is net.minecraft.server.level.ServerPlayer)
+            (level.getBlockEntity(pos) as? CoolantExchangerBlockEntity)?.configuredBy(placer.uuid)
+    }
+
     override fun getRenderShape(state: BlockState): RenderShape = RenderShape.MODEL
 
     override fun getShape(
