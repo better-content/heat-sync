@@ -3,10 +3,10 @@ package com.bettercontent.heatsync.food
 import com.bettercontent.heatsync.HeatSyncMod
 import com.illusivesoulworks.diet.platform.Services
 import dev.ghen.thirst.foundation.common.capability.ModCapabilities
+import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.effect.MobEffect
 import net.minecraft.world.effect.MobEffectCategory
 import net.minecraft.world.entity.LivingEntity
-import net.minecraft.world.entity.player.Player
 import net.minecraft.world.item.Item
 import net.minecraft.world.food.FoodProperties
 import net.minecraftforge.registries.DeferredRegister
@@ -29,7 +29,7 @@ object FoodItems {
 private class SystemDrainEffect(color: Int, private val diet: Boolean) : MobEffect(MobEffectCategory.HARMFUL, color) {
     override fun isDurationEffectTick(duration: Int, amplifier: Int): Boolean = duration % 20 == 0
     override fun applyEffectTick(entity: LivingEntity, amplifier: Int) {
-        val player = entity as? Player ?: return
+        val player = entity as? ServerPlayer ?: return
         if (diet) DietBridge.drain(player, amplifier) else ThirstBridge.drain(player, amplifier)
     }
 }
@@ -37,7 +37,7 @@ private class SystemDrainEffect(color: Int, private val diet: Boolean) : MobEffe
 private object ThirstBridge {
     private val pendingLoss = mutableMapOf<java.util.UUID, Double>()
 
-    fun drain(player: Player, amplifier: Int) {
+    fun drain(player: ServerPlayer, amplifier: Int) {
         if (!ModList.get().isLoaded("thirst")) return
         player.getCapability(ModCapabilities.PLAYER_THIRST).ifPresent { thirst ->
             val now = thirst.thirst
@@ -55,7 +55,7 @@ private object ThirstBridge {
 }
 
 private object DietBridge {
-    fun drain(player: Player, amplifier: Int) {
+    fun drain(player: ServerPlayer, amplifier: Int) {
         if (!ModList.get().isLoaded("diet")) return
         Services.CAPABILITY.get(player).ifPresent { tracker ->
             val total = doubleArrayOf(0.02, 0.06, 0.10)[amplifier.coerceIn(0, 2)] / 60.0

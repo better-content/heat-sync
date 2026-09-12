@@ -18,3 +18,4 @@ All notable changes to this project are documented in this file.
 - Normalize the project identity to `heat-sync / heat_sync (formerly heatsync)`; this is a clean break with no legacy aliases or migrations.
 - Allow otherwise-identical food stacks with different thermal state to merge, recomputing temperature and decay by item-count-weighted averaging while preserving the ordinary item identity and all non-thermal data.
 - Emit optional correlated Threads evidence when frozen food is rejected and the same ordinary item is later consumed thawed and fresh.
+- Keep spoiled-food Thirst and Diet drains server-authoritative, preventing client-side capability mutation and a Thirst sync crash.
