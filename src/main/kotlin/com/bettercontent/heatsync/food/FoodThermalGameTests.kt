@@ -3,6 +3,7 @@ package com.bettercontent.heatsync.food
 import com.bettercontent.heatsync.HeatSyncMod
 import com.bettercontent.heatsync.HeatSyncRegistries
 import com.bettercontent.heatsync.content.heat.ConstantTemperatureBlockEntity
+import com.bettercontent.heatsync.content.heat.ThermalFireboxBlockEntity
 import net.minecraft.core.BlockPos
 import net.minecraft.gametest.framework.GameTest
 import net.minecraft.gametest.framework.GameTestHelper
@@ -12,6 +13,8 @@ import net.minecraft.world.item.Items
 import net.minecraft.world.level.block.Blocks
 import net.minecraft.world.level.block.entity.BarrelBlockEntity
 import net.minecraft.world.level.block.entity.ChestBlockEntity
+import net.minecraftforge.common.capabilities.ForgeCapabilities
+import net.minecraftforge.items.IItemHandlerModifiable
 import net.minecraftforge.gametest.GameTestHolder
 import net.minecraftforge.gametest.PrefixGameTestTemplate
 import net.minecraftforge.registries.ForgeRegistries
@@ -74,6 +77,27 @@ class FoodThermalGameTests {
         helper.succeedIf {
             helper.assertTrue(!FoodThermalService.isActivated(barrel), "An untouched inventory must remain thermally dormant")
             helper.assertTrue(barrel.getItem(0).tag?.contains("heat_sync_food") != true, "Dormant loot must remain fresh")
+        }
+    }
+
+    @GameTest(template = "coolant_exchanger", timeoutTicks = 20)
+    fun machineItemHandlerOutputActivatesThermalTracking(helper: GameTestHelper) {
+        val pos = BlockPos(4, 1, 2)
+        helper.setBlock(pos, HeatSyncRegistries.THERMAL_FIREBOX.get())
+        val firebox = requireNotNull(helper.getBlockEntity(pos) as? ThermalFireboxBlockEntity)
+        val inventory = firebox.getCapability(ForgeCapabilities.ITEM_HANDLER).resolve()
+            .orElseThrow { IllegalStateException("Thermal firebox item capability was unavailable") }
+            as IItemHandlerModifiable
+
+        // setStackInSlot models a completed machine output after its recipe has admitted it.
+        inventory.setStackInSlot(0, ItemStack(Items.APPLE))
+
+        helper.succeedIf {
+            helper.assertTrue(FoodThermalService.isActivated(firebox), "A machine food output must activate thermal tracking")
+            helper.assertTrue(
+                inventory.getStackInSlot(0).tag?.contains("heat_sync_food") == true,
+                "A machine food output must receive thermal state on admission",
+            )
         }
     }
 

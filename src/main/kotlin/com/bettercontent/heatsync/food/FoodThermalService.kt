@@ -271,7 +271,13 @@ object FoodThermalService {
 
     @JvmStatic
     fun onBlockEntityChanged(blockEntity: BlockEntity) {
-        if (blockEntity.level?.isClientSide != false || !blockEntity.persistentData.getBoolean(ACTIVE)) return
+        if (blockEntity.level?.isClientSide != false || blockEntity.isRemoved || reconciling.get()) return
+        // A Forge machine can create food without a player opening it. Containers stay
+        // dormant so world-generated loot is not admitted merely because it was loaded.
+        if (!blockEntity.persistentData.getBoolean(ACTIVE)) {
+            if (blockEntity is Container || inventoryFingerprint(blockEntity) == 0) return
+            activateInventory(blockEntity, reconcileNow = false)
+        }
         reconcileBlockInventory(blockEntity, force = false)
     }
 
