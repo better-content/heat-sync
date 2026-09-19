@@ -66,10 +66,10 @@ object FoodThermalService {
         return when {
             id.contains("vodka") || id.contains("rum") -> Profile("distilled_alcohol", null, -25.0, false)
             id.contains("beer") || id.contains("wine") || id.contains("mead") -> Profile("fermented_alcohol", null, -5.0, false)
-            id.contains("grog") || id.contains("nog") || id.contains("cocktail") -> Profile("alcoholic_cocktail", 28.0, -5.0, false)
+            id.contains("grog") || id.contains("nog") || id.contains("cocktail") -> Profile("preserved", 1.0, -5.0, false)
             stack.`is`(HeatSyncThermalTags.DRIED_FOODS) -> Profile("dried", 1.0, null, meat)
             id.contains("canned") || id.contains("golden_") -> Profile("shelf_stable", null, 0.0, meat)
-            id.contains("jerky") || id.contains("pickle") || id.contains("kimchi") || id.contains("jam") || id.contains("marmalade") || id.contains("smoked") || id.contains("cheese") -> Profile("preserved", 28.0, 0.0, meat)
+            id.contains("jerky") || id.contains("pickle") || id.contains("kimchi") || id.contains("jam") || id.contains("marmalade") || id.contains("smoked") || id.contains("cheese") -> Profile("preserved", 1.0, 0.0, meat)
             meat || id.contains("raw_") -> Profile("raw_animal", 1.0, 0.0, meat)
             id.contains("apple") || id.contains("berry") || id.contains("carrot") || id.contains("potato") || id.contains("melon") || id.contains("vegetable") -> Profile("fresh_produce", 1.0, 0.0, false)
             else -> Profile("prepared", 1.0, 0.0, meat)
@@ -156,7 +156,7 @@ object FoodThermalService {
     private fun preservationRate(profile: Profile, temperatureK: Double): Double = when {
         profile.days == null -> 0.0
         temperatureK - 273.15 <= (profile.freezingC ?: Double.NEGATIVE_INFINITY) -> 0.0
-        temperatureK - 273.15 <= REFRIGERATION_C || profile.id == "dried" -> 0.1
+        temperatureK - 273.15 <= REFRIGERATION_C || profile.id == "dried" || profile.id == "preserved" -> 0.1
         else -> 1.0
     }
 
