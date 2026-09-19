@@ -85,11 +85,25 @@ class FoodThermalGameTests {
 
         val warmApple = ItemStack(Items.APPLE)
         thermalState(warmApple, temperature = 295.15)
+        FoodThermalService.tick(warmApple, 295.15, 23_999)
+        helper.assertTrue(FoodThermalService.stage(warmApple) == FoodThermalService.Stage.FRESH, "Ordinary food became harmful before 24,000 active ticks")
         FoodThermalService.tick(warmApple, 295.15, 24_000)
 
         helper.succeedIf {
             helper.assertTrue(decay(frozenApple) == 0.0, "Frozen food must not accumulate spoilage")
             helper.assertTrue(decay(warmApple) == 1.0, "Ordinary warm food must reach harmful spoilage at 24,000 active ticks")
+            helper.assertTrue(FoodThermalService.stage(warmApple) == FoodThermalService.Stage.STALE, "First harmful stage must begin at 24,000 active ticks")
+        }
+    }
+
+    @GameTest(template = "coolant_exchanger", timeoutTicks = 20)
+    fun repeatedUpdatesDoNotRoundAwayElapsedFoodAge(helper: GameTestHelper) {
+        val apple = ItemStack(Items.APPLE)
+        thermalState(apple, temperature = 295.15)
+        for (time in 1L..24_000L) FoodThermalService.tick(apple, 295.15, time)
+        helper.succeedIf {
+            helper.assertTrue(decay(apple) >= 1.0 - 1.0e-9, "Per-update rounding erased ordinary spoilage")
+            helper.assertTrue(FoodThermalService.stage(apple) == FoodThermalService.Stage.STALE, "Repeated updates changed the harmful-stage boundary")
         }
     }
 
@@ -113,11 +127,11 @@ class FoodThermalGameTests {
         thermalState(food, temperature = 295.15)
         food.tag!!.getCompound("heat_sync_food").putDouble("decay", 0.0)
         val fresh = FoodThermalService.itemTint(food)
-        food.tag!!.getCompound("heat_sync_food").putDouble("decay", 1.0 / 7.0)
+        food.tag!!.getCompound("heat_sync_food").putDouble("decay", 1.0)
         val stale = FoodThermalService.itemTint(food)
-        food.tag!!.getCompound("heat_sync_food").putDouble("decay", 3.0 / 7.0)
+        food.tag!!.getCompound("heat_sync_food").putDouble("decay", 1.5)
         val spoiled = FoodThermalService.itemTint(food)
-        food.tag!!.getCompound("heat_sync_food").putDouble("decay", 5.0 / 7.0)
+        food.tag!!.getCompound("heat_sync_food").putDouble("decay", 2.0)
         val rotten = FoodThermalService.itemTint(food)
         food.tag!!.getCompound("heat_sync_food").putInt("temperature_bucket_c", -1)
         val frozen = FoodThermalService.itemTint(food)
@@ -182,7 +196,7 @@ class FoodThermalGameTests {
         val thawedApple = ItemStack(Items.APPLE)
         thermalState(thawedApple, temperature = 295.15)
         val staleApple = thawedApple.copy().also {
-            it.tag!!.getCompound("heat_sync_food").putDouble("decay", 1.0 / 7.0)
+            it.tag!!.getCompound("heat_sync_food").putDouble("decay", 1.0)
         }
 
         helper.succeedIf {

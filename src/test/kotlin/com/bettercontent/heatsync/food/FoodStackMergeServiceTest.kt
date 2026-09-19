@@ -17,11 +17,12 @@ class FoodStackMergeServiceTest {
     }
 
     @Test
-    fun `temperature and decay quantization are deterministic`() {
+    fun `temperature bucket is deterministic while decay retains fractions`() {
         assertEquals(4, FoodStackMergeService.bucketForKelvin(295.15))
         assertEquals(5, FoodStackMergeService.bucketForKelvin(295.65))
-        assertEquals(0.5, FoodStackMergeService.quantizeDecay(0.501), 1.0e-9)
-        assertEquals(71.0 / 140.0, FoodStackMergeService.quantizeDecay(0.506), 1.0e-9)
+        val destination = values(295.15, 0.501, 100)
+        val source = values(295.15, 0.506, 100)
+        assertEquals(0.5035, FoodStackMergeService.weighted(destination, 1, source, 1).decay, 1.0e-9)
     }
 
     private fun values(temperatureK: Double, decay: Double, lastTime: Long) =

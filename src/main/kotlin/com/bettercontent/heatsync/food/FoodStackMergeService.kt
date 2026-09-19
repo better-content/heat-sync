@@ -5,7 +5,6 @@ import net.minecraft.world.item.ItemStack
 import kotlin.math.exp
 import kotlin.math.floor
 import kotlin.math.max
-import kotlin.math.round
 
 /** Compatibility and commit-time state folding for food stacks whose only differing tag is Heat Sync. */
 object FoodStackMergeService {
@@ -22,7 +21,6 @@ object FoodStackMergeService {
     private const val WORLD_TAU_TICKS = 4000.0
     private const val APPLIANCE_TAU_TICKS = 200.0
     private const val TEMPERATURE_BUCKET_C = 5.0
-    private const val DECAY_STEPS = 140.0
     private const val REFRIGERATION_C = 5.0
 
     internal data class ThermalValues(
@@ -74,7 +72,7 @@ object FoodStackMergeService {
         val thermal = CompoundTag()
         thermal.putInt(VERSION, CURRENT_VERSION)
         thermal.putInt(TEMPERATURE_BUCKET, bucketForKelvin(merged.temperatureK))
-        thermal.putDouble(DECAY, quantizeDecay(merged.decay))
+        thermal.putDouble(DECAY, merged.decay.coerceIn(0.0, 2.5))
         thermal.putLong(LAST_TIME, commonTime)
         thermal.putInt(LAST_TARGET_BUCKET, target.targetBucket)
         thermal.putBoolean(LAST_TARGET_APPLIANCE, target.targetAppliance)
@@ -105,7 +103,7 @@ object FoodStackMergeService {
             ?: return ThermalValues(AMBIENT_K, 0.0, 0L, bucketForKelvin(AMBIENT_K), false, 1.0, false)
         return ThermalValues(
             temperatureK = kelvinForBucket(tag.getInt(TEMPERATURE_BUCKET)),
-            decay = tag.getDouble(DECAY).coerceIn(0.0, 1.0),
+            decay = tag.getDouble(DECAY).coerceIn(0.0, 2.5),
             lastTime = tag.getLong(LAST_TIME),
             targetBucket = tag.getInt(LAST_TARGET_BUCKET),
             targetAppliance = tag.getBoolean(LAST_TARGET_APPLIANCE),
@@ -125,7 +123,7 @@ object FoodStackMergeService {
         val decay = if (days != null) {
             values.decay + elapsed * values.preservationRate / (days * 24000.0)
         } else values.decay
-        return values.copy(temperatureK = temperatureK, decay = decay.coerceIn(0.0, 1.0), lastTime = commonTime)
+        return values.copy(temperatureK = temperatureK, decay = decay.coerceIn(0.0, 2.5), lastTime = commonTime)
     }
 
     private fun tagWithoutThermalState(stack: ItemStack): CompoundTag? {
@@ -137,6 +135,4 @@ object FoodStackMergeService {
     internal fun bucketForKelvin(kelvin: Double): Int =
         floor((kelvin - 273.15) / TEMPERATURE_BUCKET_C + 0.5).toInt()
     internal fun kelvinForBucket(bucket: Int): Double = bucket * TEMPERATURE_BUCKET_C + 273.15
-    internal fun quantizeDecay(value: Double): Double =
-        (round(value.coerceIn(0.0, 1.0) * DECAY_STEPS) / DECAY_STEPS).coerceIn(0.0, 1.0)
 }

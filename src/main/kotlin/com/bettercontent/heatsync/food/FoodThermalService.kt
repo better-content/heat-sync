@@ -50,7 +50,6 @@ object FoodThermalService {
     private const val CURRENT_VERSION = 3
     private const val WORLD_TAU_TICKS = 4000.0 // 95% in twenty minutes
     private const val TEMPERATURE_BUCKET_C = 5.0
-    private const val DECAY_STEPS = 140.0
     private const val REFRIGERATION_C = 5.0
     private val inventoryFingerprints = Collections.synchronizedMap(WeakHashMap<BlockEntity, Int>())
     private val playerInventoryFingerprints = Collections.synchronizedMap(WeakHashMap<Player, Int>())
@@ -95,12 +94,13 @@ object FoodThermalService {
     }
 
     fun stage(stack: ItemStack): Stage {
-        val value = stack.tag?.getCompound(KEY)?.getDouble(DECAY) ?: 0.0
+        // Float accumulation may undershoot an exact tick boundary by a few ulps.
+        val value = (stack.tag?.getCompound(KEY)?.getDouble(DECAY) ?: 0.0) + 1.0e-10
         return when {
-            value >= 1.0 -> Stage.CONVERTED
-            value >= 5.0 / 7.0 -> Stage.ROTTEN
-            value >= 3.0 / 7.0 -> Stage.SPOILED
-            value >= 1.0 / 7.0 -> Stage.STALE
+            value >= 2.5 -> Stage.CONVERTED
+            value >= 2.0 -> Stage.ROTTEN
+            value >= 1.5 -> Stage.SPOILED
+            value >= 1.0 -> Stage.STALE
             else -> Stage.FRESH
         }
     }
@@ -143,7 +143,7 @@ object FoodThermalService {
             val priorRate = if (tag.contains(PRESERVATION_RATE)) tag.getDouble(PRESERVATION_RATE).coerceIn(0.0, 1.0)
             else preservationRate(profile, old)
             val added = elapsed * priorRate / (days * 24000.0)
-            tag.putDouble(DECAY, quantizeDecay(tag.getDouble(DECAY) + added))
+            tag.putDouble(DECAY, (tag.getDouble(DECAY) + added).coerceIn(0.0, 2.5))
         }
         tag.putLong(LAST_TIME, gameTime)
         tag.putInt(LAST_TARGET_BUCKET, bucketForKelvin(targetK))
@@ -167,9 +167,6 @@ object FoodThermalService {
     }
 
     private fun kelvinForBucket(bucket: Int): Double = bucket * TEMPERATURE_BUCKET_C + 273.15
-
-    private fun quantizeDecay(value: Double): Double =
-        (kotlin.math.round(value.coerceIn(0.0, 1.0) * DECAY_STEPS) / DECAY_STEPS).coerceAtMost(1.0)
 
     /** Updates a real block inventory from local Cold Sweat temperature and adjacent thermal blocks. */
     fun tickContainer(level: Level, pos: BlockPos, container: Container, gameTime: Long) {
