@@ -109,6 +109,10 @@ object FoodThermalService {
         return existing
     }
 
+    /** Reads current and immediately previous thermal records during the save migration window. */
+    private fun thermalTag(stack: ItemStack): CompoundTag? = stack.tag?.getCompound(KEY)
+        ?.takeIf { it.getInt(VERSION) == CURRENT_VERSION || it.getInt(VERSION) == 3 }
+
     fun stage(stack: ItemStack): Stage {
         // Float accumulation may undershoot an exact tick boundary by a few ulps.
         val value = (stack.tag?.getCompound(KEY)?.getDouble(DECAY) ?: 0.0) + 1.0e-10
@@ -121,8 +125,7 @@ object FoodThermalService {
         }
     }
 
-    fun temperatureK(stack: ItemStack): Double = stack.tag?.getCompound(KEY)
-        ?.takeIf { it.getInt(VERSION) == CURRENT_VERSION }
+    fun temperatureK(stack: ItemStack): Double = thermalTag(stack)
         ?.let { if (it.contains(TEMPERATURE_PRECISE)) it.getDouble(TEMPERATURE_PRECISE) else kelvinForBucket(it.getInt(TEMPERATURE_BUCKET)) }
         ?: 295.15
 
@@ -133,7 +136,7 @@ object FoodThermalService {
     @JvmStatic
     fun carryCookingState(input: ItemStack, output: ItemStack) {
         if (!input.isEdible || !output.isEdible) return
-        val thermal = input.tag?.getCompound(KEY)?.takeIf { it.getInt(VERSION) == CURRENT_VERSION } ?: return
+        val thermal = thermalTag(input) ?: return
         output.orCreateTag.put(KEY, thermal.copy())
     }
 
