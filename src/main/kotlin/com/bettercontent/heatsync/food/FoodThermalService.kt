@@ -185,7 +185,7 @@ object FoodThermalService {
         return stack
     }
 
-    private fun preservationRate(profile: Profile, temperatureK: Double): Double = when {
+    internal fun preservationRate(profile: Profile, temperatureK: Double): Double = when {
         profile.days == null -> 0.0
         temperatureK - 273.15 <= (profile.freezingC ?: Double.NEGATIVE_INFINITY) -> 0.0
         temperatureK - 273.15 <= REFRIGERATION_C || profile.id == "dried" || profile.id == "preserved" -> 0.1
@@ -280,6 +280,20 @@ object FoodThermalService {
     fun onPlayerLoggedIn(event: net.minecraftforge.event.entity.player.PlayerEvent.PlayerLoggedInEvent) {
         val player = event.entity as? ServerPlayer ?: return
         reconcilePlayerInventory(player, force = true)
+    }
+
+    @SubscribeEvent
+    fun onPlayerLoggedOut(event: net.minecraftforge.event.entity.player.PlayerEvent.PlayerLoggedOutEvent) {
+        val player = event.entity as? ServerPlayer ?: return
+        // Carried food is not simulated while the player is offline. Rebase the
+        // lazy timestamp so login cannot charge the absent interval as active age.
+        val now = player.server.overworld().gameTime
+        listOf(player.inventory.items, player.inventory.armor, player.inventory.offhand)
+            .flatten()
+            .forEach { stack ->
+                stack.tag?.getCompound(KEY)?.takeIf { it.getInt(VERSION) == CURRENT_VERSION }
+                    ?.putLong(LAST_TIME, now)
+            }
     }
 
     @SubscribeEvent
