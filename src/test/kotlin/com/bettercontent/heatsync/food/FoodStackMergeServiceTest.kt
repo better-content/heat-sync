@@ -31,6 +31,7 @@ class FoodStackMergeServiceTest {
             lastTime,
             targetBucket = 4,
             targetAppliance = false,
+            preservationRate = 1.0,
             present = true,
         )
 }

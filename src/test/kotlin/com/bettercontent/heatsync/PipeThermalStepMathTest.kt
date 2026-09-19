@@ -72,4 +72,22 @@ class PipeThermalStepMathTest {
             )
         )
     }
+
+    @Test
+    fun `paired pipe observations conserve heat when external terms are disabled`() {
+        val first = PipeThermalStepMath.step(
+            pipeHeat = 300.0, neighborAverage = 100.0,
+            ambientBlendRate = 0.0, networkEqualizationStrength = 0.30,
+            coldSourcePullRate = 0.0, pipeLossPerTick = 0.0, minPipeHeat = 0.0, maxPipeHeat = 400.0,
+        )
+        val second = PipeThermalStepMath.step(
+            pipeHeat = 100.0, neighborAverage = 300.0,
+            ambientBlendRate = 0.0, networkEqualizationStrength = 0.30,
+            coldSourcePullRate = 0.0, pipeLossPerTick = 0.0, minPipeHeat = 0.0, maxPipeHeat = 400.0,
+        )
+
+        assertEquals(400.0, first + second, 1.0e-9)
+        assertEquals(240.0, first, 1.0e-9)
+        assertEquals(160.0, second, 1.0e-9)
+    }
 }

@@ -111,6 +111,7 @@ object HeatSyncPipeThermalController {
             maxPipeHeat = HeatSyncConfig.pipeMaxHeat()
         )
 
+        val pipes = mutableListOf<HeatPipeBlockEntity>()
         val iterator = tracked.iterator()
         while (iterator.hasNext()) {
             val pipePos = BlockPos.of(iterator.nextLong())
@@ -125,37 +126,39 @@ object HeatSyncPipeThermalController {
                 continue
             }
 
-            updatePipe(level, pipe, parameters)
+            pipes += pipe
+        }
+        // Calculate a whole round from the same observations.  Mutating a pipe before
+        // observing its neighbour turns equalisation into a lossy sequential average.
+        val snapshot = pipes.associateBy({ it.blockPos }, { it.getHeat().toDouble() })
+        val updates = pipes.mapNotNull { pipe ->
+            val currentHeat = snapshot.getValue(pipe.blockPos)
+            val nextHeat = PipeThermalMath.step(
+                pipeHeat = currentHeat,
+                ambientHeat = AmbientHeatSampling.samplePipeHeat(level, pipe.blockPos),
+                neighborAverage = resolveNeighborAverage(level, pipe.blockPos, pipe, snapshot),
+                sourceHeat = resolveSourceHeat(level, pipe.blockPos),
+                ambientBlendRate = parameters.ambientBlendRate,
+                networkEqualizationStrength = parameters.networkEqualizationStrength,
+                coldSourcePullRate = parameters.coldSourcePullRate,
+                pipeLossPerTick = parameters.pipeLossPerTick,
+                minPipeHeat = parameters.minPipeHeat,
+                maxPipeHeat = parameters.maxPipeHeat
+            )
+            if (abs(nextHeat - currentHeat) < MIN_HEAT_DELTA) null else pipe to nextHeat
+        }
+        updates.forEach { (pipe, nextHeat) ->
+            pipe.setHeat(nextHeat.toFloat())
+            HeatBlockEntity.trySync(pipe)
         }
     }
 
-    private fun updatePipe(level: Level, pipe: HeatPipeBlockEntity, parameters: ThermalStepParameters) {
-        val currentHeat = pipe.getHeat().toDouble()
-        val ambientHeat = AmbientHeatSampling.samplePipeHeat(level, pipe.blockPos)
-        val neighborAverage = resolveNeighborAverage(level, pipe.blockPos, pipe)
-        val sourceHeat = resolveSourceHeat(level, pipe.blockPos)
-        val nextHeat = PipeThermalMath.step(
-            pipeHeat = currentHeat,
-            ambientHeat = ambientHeat,
-            neighborAverage = neighborAverage,
-            sourceHeat = sourceHeat,
-            ambientBlendRate = parameters.ambientBlendRate,
-            networkEqualizationStrength = parameters.networkEqualizationStrength,
-            coldSourcePullRate = parameters.coldSourcePullRate,
-            pipeLossPerTick = parameters.pipeLossPerTick,
-            minPipeHeat = parameters.minPipeHeat,
-            maxPipeHeat = parameters.maxPipeHeat
-        )
-
-        if (abs(nextHeat - currentHeat) < MIN_HEAT_DELTA) {
-            return
-        }
-
-        pipe.setHeat(nextHeat.toFloat())
-        HeatBlockEntity.trySync(pipe)
-    }
-
-    private fun resolveNeighborAverage(level: Level, pos: BlockPos, pipe: HeatPipeBlockEntity): Double? {
+    private fun resolveNeighborAverage(
+        level: Level,
+        pos: BlockPos,
+        pipe: HeatPipeBlockEntity,
+        snapshot: Map<BlockPos, Double>,
+    ): Double? {
         var totalHeat = 0.0
         var neighborCount = 0
 
@@ -166,7 +169,7 @@ object HeatSyncPipeThermalController {
                 continue
             }
 
-            totalHeat += neighbor.getHeat().toDouble()
+            totalHeat += snapshot[neighborEntity.blockPos] ?: neighbor.getHeat().toDouble()
             neighborCount++
         }
 

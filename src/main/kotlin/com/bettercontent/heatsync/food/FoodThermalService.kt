@@ -1,6 +1,7 @@
 package com.bettercontent.heatsync.food
 
 import com.bettercontent.heatsync.HeatSyncMod
+import com.bettercontent.heatsync.HeatSyncThermalTags
 import com.bettercontent.heatsync.ColdSweatAmbientSampler
 import com.bettercontent.heatsync.api.ThermalCapabilities
 import com.bettercontent.heatsync.api.HeatBlockEntity
@@ -43,6 +44,7 @@ object FoodThermalService {
     private const val LAST_TIME = "last_time"
     private const val LAST_TARGET_BUCKET = "last_target_bucket_c"
     private const val LAST_TARGET_APPLIANCE = "last_target_appliance"
+    private const val PRESERVATION_RATE = "preservation_rate"
     private const val VERSION = "version"
     private const val ACTIVE = "heat_sync_food_active"
     private const val CURRENT_VERSION = 3
@@ -66,12 +68,12 @@ object FoodThermalService {
             id.contains("vodka") || id.contains("rum") -> Profile("distilled_alcohol", null, -25.0, false)
             id.contains("beer") || id.contains("wine") || id.contains("mead") -> Profile("fermented_alcohol", null, -5.0, false)
             id.contains("grog") || id.contains("nog") || id.contains("cocktail") -> Profile("alcoholic_cocktail", 28.0, -5.0, false)
-            id.contains("dried") -> Profile("dried", null, null, meat)
+            stack.`is`(HeatSyncThermalTags.DRIED_FOODS) -> Profile("dried", 1.0, null, meat)
             id.contains("canned") || id.contains("golden_") -> Profile("shelf_stable", null, 0.0, meat)
             id.contains("jerky") || id.contains("pickle") || id.contains("kimchi") || id.contains("jam") || id.contains("marmalade") || id.contains("smoked") || id.contains("cheese") -> Profile("preserved", 28.0, 0.0, meat)
-            meat || id.contains("raw_") -> Profile("raw_animal", 3.0, 0.0, meat)
-            id.contains("apple") || id.contains("berry") || id.contains("carrot") || id.contains("potato") || id.contains("melon") || id.contains("vegetable") -> Profile("fresh_produce", 5.0, 0.0, false)
-            else -> Profile("prepared", 7.0, 0.0, meat)
+            meat || id.contains("raw_") -> Profile("raw_animal", 1.0, 0.0, meat)
+            id.contains("apple") || id.contains("berry") || id.contains("carrot") || id.contains("potato") || id.contains("melon") || id.contains("vegetable") -> Profile("fresh_produce", 1.0, 0.0, false)
+            else -> Profile("prepared", 1.0, 0.0, meat)
         }
     }
 
@@ -87,6 +89,7 @@ object FoodThermalService {
         existing.putLong(LAST_TIME, gameTime)
         existing.putInt(LAST_TARGET_BUCKET, targetBucket)
         existing.putBoolean(LAST_TARGET_APPLIANCE, false)
+        existing.putDouble(PRESERVATION_RATE, preservationRate(profile(stack), targetK))
         root.put(KEY, existing)
         return existing
     }
@@ -135,16 +138,26 @@ object FoodThermalService {
         val next = priorTarget + (old - priorTarget) * exp(-elapsed / tau)
         tag.putInt(TEMPERATURE_BUCKET, bucketForKelvin(next))
         profile.days?.let { days ->
-            if (next - 273.15 > REFRIGERATION_C) {
-                val added = elapsed / (days * 24000.0)
-                tag.putDouble(DECAY, quantizeDecay(tag.getDouble(DECAY) + added))
-            }
+            // Settle elapsed age under the category persisted at the last update. This
+            // makes a late refrigerator/freezer transition unable to erase warm time.
+            val priorRate = if (tag.contains(PRESERVATION_RATE)) tag.getDouble(PRESERVATION_RATE).coerceIn(0.0, 1.0)
+            else preservationRate(profile, old)
+            val added = elapsed * priorRate / (days * 24000.0)
+            tag.putDouble(DECAY, quantizeDecay(tag.getDouble(DECAY) + added))
         }
         tag.putLong(LAST_TIME, gameTime)
         tag.putInt(LAST_TARGET_BUCKET, bucketForKelvin(targetK))
         tag.putBoolean(LAST_TARGET_APPLIANCE, appliance)
+        tag.putDouble(PRESERVATION_RATE, preservationRate(profile, next))
         if (stage(stack) >= Stage.ROTTEN) return ItemStack(if (profile.meat) FoodItems.SPOILED_MEAT.get() else FoodItems.SPOILED_PRODUCE.get(), stack.count)
         return stack
+    }
+
+    private fun preservationRate(profile: Profile, temperatureK: Double): Double = when {
+        profile.days == null -> 0.0
+        temperatureK - 273.15 <= (profile.freezingC ?: Double.NEGATIVE_INFINITY) -> 0.0
+        temperatureK - 273.15 <= REFRIGERATION_C || profile.id == "dried" -> 0.1
+        else -> 1.0
     }
 
     private fun bucketForKelvin(kelvin: Double): Int {

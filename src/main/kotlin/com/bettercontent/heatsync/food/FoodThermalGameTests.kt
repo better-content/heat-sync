@@ -89,7 +89,21 @@ class FoodThermalGameTests {
 
         helper.succeedIf {
             helper.assertTrue(decay(frozenApple) == 0.0, "Frozen food must not accumulate spoilage")
-            helper.assertTrue(decay(warmApple) > 0.0, "Warm food must accumulate spoilage")
+            helper.assertTrue(decay(warmApple) == 1.0, "Ordinary warm food must reach harmful spoilage at 24,000 active ticks")
+        }
+    }
+
+    @GameTest(template = "coolant_exchanger", timeoutTicks = 20)
+    fun refrigerationUsesOneTenthActiveSpoilageRate(helper: GameTestHelper) {
+        val chilledApple = ItemStack(Items.APPLE)
+        thermalState(chilledApple, temperature = 278.15)
+        FoodThermalService.tick(chilledApple, 278.15, 24_000)
+
+        helper.succeedIf {
+            helper.assertTrue(
+                decay(chilledApple) == 0.1,
+                "Refrigerated food must retain one tenth, rather than zero, active spoilage rate",
+            )
         }
     }
 
@@ -199,6 +213,11 @@ class FoodThermalGameTests {
         state.putInt("temperature_bucket_c", bucket)
         state.putInt("last_target_bucket_c", bucket)
         state.putBoolean("last_target_appliance", false)
+        state.putDouble("preservation_rate", when {
+            temperature <= 273.15 -> 0.0
+            temperature <= 278.15 -> 0.1
+            else -> 1.0
+        })
         state.putDouble("decay", decay)
         state.putLong("last_time", lastTime)
         stack.orCreateTag.put("heat_sync_food", state)

@@ -15,6 +15,7 @@ object FoodStackMergeService {
     private const val LAST_TIME = "last_time"
     private const val LAST_TARGET_BUCKET = "last_target_bucket_c"
     private const val LAST_TARGET_APPLIANCE = "last_target_appliance"
+    private const val PRESERVATION_RATE = "preservation_rate"
     private const val VERSION = "version"
     private const val CURRENT_VERSION = 3
     private const val AMBIENT_K = 295.15
@@ -30,6 +31,7 @@ object FoodStackMergeService {
         val lastTime: Long,
         val targetBucket: Int,
         val targetAppliance: Boolean,
+        val preservationRate: Double,
         val present: Boolean,
     )
 
@@ -66,7 +68,7 @@ object FoodStackMergeService {
         val target = when {
             destinationRaw.present -> destinationRaw
             sourceRaw.present -> sourceRaw
-            else -> ThermalValues(AMBIENT_K, 0.0, commonTime, bucketForKelvin(AMBIENT_K), false, false)
+            else -> ThermalValues(AMBIENT_K, 0.0, commonTime, bucketForKelvin(AMBIENT_K), false, 1.0, false)
         }
 
         val thermal = CompoundTag()
@@ -76,6 +78,7 @@ object FoodStackMergeService {
         thermal.putLong(LAST_TIME, commonTime)
         thermal.putInt(LAST_TARGET_BUCKET, target.targetBucket)
         thermal.putBoolean(LAST_TARGET_APPLIANCE, target.targetAppliance)
+        thermal.putDouble(PRESERVATION_RATE, target.preservationRate)
         output.orCreateTag.put(KEY, thermal)
     }
 
@@ -92,19 +95,21 @@ object FoodStackMergeService {
             lastTime = max(destination.lastTime, source.lastTime),
             targetBucket = destination.targetBucket,
             targetAppliance = destination.targetAppliance,
+            preservationRate = destination.preservationRate,
             present = true,
         )
     }
 
     private fun read(stack: ItemStack): ThermalValues {
         val tag = stack.tag?.getCompound(KEY)?.takeIf { it.getInt(VERSION) == CURRENT_VERSION }
-            ?: return ThermalValues(AMBIENT_K, 0.0, 0L, bucketForKelvin(AMBIENT_K), false, false)
+            ?: return ThermalValues(AMBIENT_K, 0.0, 0L, bucketForKelvin(AMBIENT_K), false, 1.0, false)
         return ThermalValues(
             temperatureK = kelvinForBucket(tag.getInt(TEMPERATURE_BUCKET)),
             decay = tag.getDouble(DECAY).coerceIn(0.0, 1.0),
             lastTime = tag.getLong(LAST_TIME),
             targetBucket = tag.getInt(LAST_TARGET_BUCKET),
             targetAppliance = tag.getBoolean(LAST_TARGET_APPLIANCE),
+            preservationRate = tag.getDouble(PRESERVATION_RATE).takeIf { it in 0.0..1.0 } ?: 1.0,
             present = true,
         )
     }
@@ -117,8 +122,8 @@ object FoodStackMergeService {
         val tau = if (values.targetAppliance) APPLIANCE_TAU_TICKS else WORLD_TAU_TICKS
         val temperatureK = targetK + (values.temperatureK - targetK) * exp(-elapsed / tau)
         val days = FoodThermalService.profile(stack).days
-        val decay = if (days != null && temperatureK - 273.15 > REFRIGERATION_C) {
-            values.decay + elapsed / (days * 24000.0)
+        val decay = if (days != null) {
+            values.decay + elapsed * values.preservationRate / (days * 24000.0)
         } else values.decay
         return values.copy(temperatureK = temperatureK, decay = decay.coerceIn(0.0, 1.0), lastTime = commonTime)
     }
