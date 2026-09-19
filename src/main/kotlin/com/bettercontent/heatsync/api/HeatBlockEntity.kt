@@ -48,6 +48,10 @@ interface HeatBlockEntity : IHeatStorage {
             for (direction in Direction.values()) {
                 if (!source.canExtract(direction)) continue
                 val targetEntity = level.getBlockEntity(sourceEntity.blockPos.relative(direction)) ?: continue
+                // Each adjacent pair is settled once per interval. Without a
+                // stable ownership rule, both pipes immediately process the same
+                // edge and traversal order changes the result.
+                if (sourceEntity.blockPos.asLong() >= targetEntity.blockPos.asLong()) continue
                 targetEntity.getCapability(HeatCapabilities.HEAT, direction.opposite).ifPresent { target ->
                     if (source.getHeat() > target.getHeat()) {
                         if (!target.canAdd(direction.opposite)) return@ifPresent
