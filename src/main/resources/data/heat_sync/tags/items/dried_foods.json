@@ -1,0 +1,12 @@
+{
+  "replace": false,
+  "values": [
+    "hexerei:dried_belladonna_flowers",
+    "hexerei:dried_mandrake_flowers",
+    "hexerei:dried_mugwort_flowers",
+    "hexerei:dried_mugwort_leaves",
+    "hexerei:dried_sage",
+    "hexerei:dried_yellow_dock_flowers",
+    "hexerei:dried_yellow_dock_leaves"
+  ]
+}

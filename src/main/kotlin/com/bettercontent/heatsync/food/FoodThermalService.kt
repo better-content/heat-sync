@@ -137,6 +137,10 @@ object FoodThermalService {
         output.orCreateTag.put(KEY, thermal.copy())
     }
 
+    /** Drying racks preserve the input's thermal state while producing a dried food. */
+    @JvmStatic
+    fun carryDryingState(input: ItemStack, output: ItemStack) = carryCookingState(input, output)
+
     /** Item-model tint: frozen food is visibly ice-blue; spoilage deepens from faded brown to near-black. */
     fun itemTint(stack: ItemStack): Int {
         if (!stack.isEdible) return 0xFFFFFF
