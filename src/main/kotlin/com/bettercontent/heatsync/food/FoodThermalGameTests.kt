@@ -121,6 +121,23 @@ class FoodThermalGameTests {
     }
 
     @GameTest(template = "coolant_exchanger", timeoutTicks = 20)
+    fun cookingCarriesOnlyThermalFoodState(helper: GameTestHelper) {
+        val raw = ItemStack(Items.BEEF)
+        thermalState(raw, temperature = 278.15, decay = 0.6, lastTime = 400)
+        val cooked = ItemStack(Items.COOKED_BEEF)
+        cooked.orCreateTag.putString("recipe_marker", "kept")
+
+        FoodThermalService.carryCookingState(raw, cooked)
+
+        helper.succeedIf {
+            helper.assertTrue(decay(cooked) == 0.6, "Cooking must retain accumulated food age")
+            helper.assertTrue(FoodThermalService.temperatureK(cooked) == 278.15, "Cooking must retain physical food temperature")
+            helper.assertTrue(cooked.tag?.getString("recipe_marker") == "kept", "Cooking must retain result-owned NBT")
+            helper.assertTrue(decay(raw) == 0.6, "Cooking must not mutate its input remainder")
+        }
+    }
+
+    @GameTest(template = "coolant_exchanger", timeoutTicks = 20)
     fun repeatedUpdatesDoNotRoundAwayElapsedFoodAge(helper: GameTestHelper) {
         val apple = ItemStack(Items.APPLE)
         thermalState(apple, temperature = 295.15)

@@ -114,6 +114,14 @@ object FoodThermalService {
     fun isFrozen(stack: ItemStack): Boolean =
         profile(stack).freezingC?.let { temperatureK(stack) - 273.15 <= it } == true
 
+    /** Cooking changes the ordinary item but must not reset its elapsed food state. */
+    @JvmStatic
+    fun carryCookingState(input: ItemStack, output: ItemStack) {
+        if (!input.isEdible || !output.isEdible) return
+        val thermal = input.tag?.getCompound(KEY)?.takeIf { it.getInt(VERSION) == CURRENT_VERSION } ?: return
+        output.orCreateTag.put(KEY, thermal.copy())
+    }
+
     /** Item-model tint: frozen food is visibly ice-blue; spoilage deepens from faded brown to near-black. */
     fun itemTint(stack: ItemStack): Int {
         if (!stack.isEdible) return 0xFFFFFF
