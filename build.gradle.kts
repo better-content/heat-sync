@@ -44,6 +44,7 @@ val emiCurseFileId = property("emi_curse_file_id") as String
 val powerGridVersion = property("powergrid_version") as String
 val pneumaticCraftCurseFileId = property("pneumaticcraft_curse_file_id") as String
 val ae2CurseFileId = property("ae2_curse_file_id") as String
+val hexereiCurseFileId = property("hexerei_curse_file_id") as String
 val modId = property("mod_id") as String
 val modName = property("mod_name") as String
 val modVersion = property("mod_version") as String
@@ -275,6 +276,7 @@ dependencies {
     compileOnly(deobf("curse.maven:applied-energistics-2-223794:$ae2CurseFileId"))
     compileOnly(deobf("curse.maven:thirst-was-taken-679270:6660408"))
     compileOnly(deobf("curse.maven:diet-443570:4813904"))
+    compileOnly(deobf("curse.maven:hexerei-548599:$hexereiCurseFileId"))
 
     testImplementation(kotlin("test"))
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
