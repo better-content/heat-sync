@@ -148,7 +148,10 @@ object FoodThermalService {
         tag.putLong(LAST_TIME, gameTime)
         tag.putInt(LAST_TARGET_BUCKET, bucketForKelvin(targetK))
         tag.putBoolean(LAST_TARGET_APPLIANCE, appliance)
-        tag.putDouble(PRESERVATION_RATE, preservationRate(profile, next))
+        // The new target category governs the following lazy interval. Physical temperature
+        // approaches that target separately, so retaining `next` here would charge the first
+        // unloaded refrigerator/freezer interval at the old warm rate.
+        tag.putDouble(PRESERVATION_RATE, preservationRate(profile, targetK))
         if (stage(stack) >= Stage.ROTTEN) return ItemStack(if (profile.meat) FoodItems.SPOILED_MEAT.get() else FoodItems.SPOILED_PRODUCE.get(), stack.count)
         return stack
     }

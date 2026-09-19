@@ -146,6 +146,24 @@ class FoodThermalGameTests {
     }
 
     @GameTest(template = "coolant_exchanger", timeoutTicks = 20)
+    fun lazyRefrigeratorTransitionPersistsItsNewRate(helper: GameTestHelper) {
+        val apple = ItemStack(Items.APPLE)
+        thermalState(apple, temperature = 295.15)
+
+        // The first update settles the old warm category through tick zero, then persists
+        // the refrigerator category for the interval while the container is unloaded.
+        FoodThermalService.tick(apple, 278.15, 0)
+        FoodThermalService.tick(apple, 278.15, 24_000)
+
+        helper.succeedIf {
+            helper.assertTrue(
+                decay(apple) == 0.1,
+                "A refrigerator transition must persist 0.1× for its following lazy interval",
+            )
+        }
+    }
+
+    @GameTest(template = "coolant_exchanger", timeoutTicks = 20)
     fun foodTintIntensifiesThroughSpoilageStages(helper: GameTestHelper) {
         val food = ItemStack(Items.APPLE)
         thermalState(food, temperature = 295.15)
