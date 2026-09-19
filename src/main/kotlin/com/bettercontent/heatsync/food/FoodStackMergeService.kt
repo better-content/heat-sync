@@ -10,13 +10,14 @@ import kotlin.math.max
 object FoodStackMergeService {
     private const val KEY = "heat_sync_food"
     private const val TEMPERATURE_BUCKET = "temperature_bucket_c"
+    private const val TEMPERATURE_PRECISE = "temperature_precise_k"
     private const val DECAY = "decay"
     private const val LAST_TIME = "last_time"
     private const val LAST_TARGET_BUCKET = "last_target_bucket_c"
     private const val LAST_TARGET_APPLIANCE = "last_target_appliance"
     private const val PRESERVATION_RATE = "preservation_rate"
     private const val VERSION = "version"
-    private const val CURRENT_VERSION = 3
+    private const val CURRENT_VERSION = 4
     private const val AMBIENT_K = 295.15
     private const val WORLD_TAU_TICKS = 4000.0
     private const val APPLIANCE_TAU_TICKS = 200.0
@@ -72,6 +73,7 @@ object FoodStackMergeService {
         val thermal = CompoundTag()
         thermal.putInt(VERSION, CURRENT_VERSION)
         thermal.putInt(TEMPERATURE_BUCKET, bucketForKelvin(merged.temperatureK))
+        thermal.putDouble(TEMPERATURE_PRECISE, merged.temperatureK)
         thermal.putDouble(DECAY, merged.decay.coerceIn(0.0, 2.5))
         thermal.putLong(LAST_TIME, commonTime)
         thermal.putInt(LAST_TARGET_BUCKET, target.targetBucket)
@@ -99,10 +101,10 @@ object FoodStackMergeService {
     }
 
     private fun read(stack: ItemStack): ThermalValues {
-        val tag = stack.tag?.getCompound(KEY)?.takeIf { it.getInt(VERSION) == CURRENT_VERSION }
+        val tag = stack.tag?.getCompound(KEY)?.takeIf { it.getInt(VERSION) == CURRENT_VERSION || it.getInt(VERSION) == 3 }
             ?: return ThermalValues(AMBIENT_K, 0.0, 0L, bucketForKelvin(AMBIENT_K), false, 1.0, false)
         return ThermalValues(
-            temperatureK = kelvinForBucket(tag.getInt(TEMPERATURE_BUCKET)),
+            temperatureK = if (tag.contains(TEMPERATURE_PRECISE)) tag.getDouble(TEMPERATURE_PRECISE) else kelvinForBucket(tag.getInt(TEMPERATURE_BUCKET)),
             decay = tag.getDouble(DECAY).coerceIn(0.0, 2.5),
             lastTime = tag.getLong(LAST_TIME),
             targetBucket = tag.getInt(LAST_TARGET_BUCKET),

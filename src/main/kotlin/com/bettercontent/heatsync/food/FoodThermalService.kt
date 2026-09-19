@@ -40,6 +40,7 @@ import kotlin.math.pow
 object FoodThermalService {
     private const val KEY = "heat_sync_food"
     private const val TEMPERATURE_BUCKET = "temperature_bucket_c"
+    private const val TEMPERATURE_PRECISE = "temperature_precise_k"
     private const val DECAY = "decay"
     private const val LAST_TIME = "last_time"
     private const val LAST_TARGET_BUCKET = "last_target_bucket_c"
@@ -47,7 +48,7 @@ object FoodThermalService {
     private const val PRESERVATION_RATE = "preservation_rate"
     private const val VERSION = "version"
     private const val ACTIVE = "heat_sync_food_active"
-    private const val CURRENT_VERSION = 3
+    private const val CURRENT_VERSION = 4
     private const val WORLD_TAU_TICKS = 4000.0 // 95% in twenty minutes
     private const val TEMPERATURE_BUCKET_C = 5.0
     private const val REFRIGERATION_C = 5.0
@@ -79,11 +80,26 @@ object FoodThermalService {
     fun state(stack: ItemStack, targetK: Double, gameTime: Long): CompoundTag {
         val root = stack.orCreateTag
         val existing = root.getCompound(KEY)
-        if (existing.getInt(VERSION) == CURRENT_VERSION) return existing
+        if (existing.getInt(VERSION) == CURRENT_VERSION) {
+            // v3 stored only a display bucket. Keep that state and seed the precise
+            // value once so a reload cannot rejuvenate or randomly move the food.
+            if (!existing.contains(TEMPERATURE_PRECISE)) {
+                existing.putDouble(TEMPERATURE_PRECISE, kelvinForBucket(existing.getInt(TEMPERATURE_BUCKET)))
+                root.put(KEY, existing)
+            }
+            return existing
+        }
+        if (existing.getInt(VERSION) == 3) {
+            existing.putDouble(TEMPERATURE_PRECISE, kelvinForBucket(existing.getInt(TEMPERATURE_BUCKET)))
+            existing.putInt(VERSION, CURRENT_VERSION)
+            root.put(KEY, existing)
+            return existing
+        }
         existing.allKeys.toList().forEach(existing::remove)
         val targetBucket = bucketForKelvin(targetK)
         existing.putInt(VERSION, CURRENT_VERSION)
         existing.putInt(TEMPERATURE_BUCKET, targetBucket)
+        existing.putDouble(TEMPERATURE_PRECISE, targetK)
         existing.putDouble(DECAY, 0.0)
         existing.putLong(LAST_TIME, gameTime)
         existing.putInt(LAST_TARGET_BUCKET, targetBucket)
@@ -107,8 +123,7 @@ object FoodThermalService {
 
     fun temperatureK(stack: ItemStack): Double = stack.tag?.getCompound(KEY)
         ?.takeIf { it.getInt(VERSION) == CURRENT_VERSION }
-        ?.getInt(TEMPERATURE_BUCKET)
-        ?.let(::kelvinForBucket)
+        ?.let { if (it.contains(TEMPERATURE_PRECISE)) it.getDouble(TEMPERATURE_PRECISE) else kelvinForBucket(it.getInt(TEMPERATURE_BUCKET)) }
         ?: 295.15
 
     fun isFrozen(stack: ItemStack): Boolean =
@@ -140,11 +155,13 @@ object FoodThermalService {
         val profile = profile(stack)
         val tag = state(stack, targetK, gameTime)
         val elapsed = (gameTime - tag.getLong(LAST_TIME)).coerceAtLeast(0L)
-        val old = kelvinForBucket(tag.getInt(TEMPERATURE_BUCKET))
+        val old = if (tag.contains(TEMPERATURE_PRECISE)) tag.getDouble(TEMPERATURE_PRECISE)
+        else kelvinForBucket(tag.getInt(TEMPERATURE_BUCKET))
         val priorTarget = kelvinForBucket(tag.getInt(LAST_TARGET_BUCKET))
         val tau = if (tag.getBoolean(LAST_TARGET_APPLIANCE)) 200.0 else WORLD_TAU_TICKS
         val next = priorTarget + (old - priorTarget) * exp(-elapsed / tau)
         tag.putInt(TEMPERATURE_BUCKET, bucketForKelvin(next))
+        tag.putDouble(TEMPERATURE_PRECISE, next)
         profile.days?.let { days ->
             // Settle elapsed age under the category persisted at the last update. This
             // makes a late refrigerator/freezer transition unable to erase warm time.
