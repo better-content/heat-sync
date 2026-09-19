@@ -279,7 +279,15 @@ object FoodThermalService {
     @SubscribeEvent
     fun onPlayerLoggedIn(event: net.minecraftforge.event.entity.player.PlayerEvent.PlayerLoggedInEvent) {
         val player = event.entity as? ServerPlayer ?: return
+        rebaseOfflineInventory(player, player.server.overworld().gameTime)
         reconcilePlayerInventory(player, force = true)
+    }
+
+    internal fun rebaseOfflineInventory(player: ServerPlayer, now: Long) {
+        listOf(player.inventory.items, player.inventory.armor, player.inventory.offhand).flatten().forEach { stack ->
+            stack.tag?.getCompound(KEY)?.takeIf { it.getInt(VERSION) == CURRENT_VERSION }
+                ?.putLong(LAST_TIME, now)
+        }
     }
 
     @SubscribeEvent
@@ -288,12 +296,9 @@ object FoodThermalService {
         // Carried food is not simulated while the player is offline. Rebase the
         // lazy timestamp so login cannot charge the absent interval as active age.
         val now = player.server.overworld().gameTime
-        listOf(player.inventory.items, player.inventory.armor, player.inventory.offhand)
-            .flatten()
-            .forEach { stack ->
-                stack.tag?.getCompound(KEY)?.takeIf { it.getInt(VERSION) == CURRENT_VERSION }
-                    ?.putLong(LAST_TIME, now)
-            }
+        // Settle the final online interval before rebasing the timestamp.
+        reconcilePlayerInventory(player, force = true)
+        rebaseOfflineInventory(player, now)
     }
 
     @SubscribeEvent
