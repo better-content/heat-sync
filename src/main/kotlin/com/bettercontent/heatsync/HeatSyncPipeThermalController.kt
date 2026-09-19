@@ -83,8 +83,15 @@ object HeatSyncPipeThermalController {
             return
         }
 
-        trackedPipePositions(level).add(event.pos.asLong())
+        enroll(level, event.pos)
     }
+
+    fun enroll(level: ServerLevel, pos: BlockPos) {
+        trackedPipePositions(level).add(pos.asLong())
+    }
+
+    internal fun isEnrolled(level: ServerLevel, pos: BlockPos): Boolean =
+        trackedPipePositionsByLevel[level.dimension()]?.contains(pos.asLong()) == true
 
     @SubscribeEvent
     fun onLevelTick(event: TickEvent.LevelTickEvent) {

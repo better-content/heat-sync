@@ -5,6 +5,7 @@ import com.bettercontent.heatsync.ColdSweatBridgeGameTestAssertions
 import com.bettercontent.heatsync.HeatSyncConfig
 import com.bettercontent.heatsync.HeatSyncMod
 import com.bettercontent.heatsync.HeatSyncRegistries
+import com.bettercontent.heatsync.HeatSyncPipeThermalController
 import com.bettercontent.heatsync.HeatSyncThermalTags
 import com.bettercontent.heatsync.PipeThermalSourceResolver
 import com.bettercontent.heatsync.api.HeatBlockEntity
@@ -21,6 +22,22 @@ import net.minecraftforge.gametest.PrefixGameTestTemplate
 @GameTestHolder(HeatSyncMod.MOD_ID)
 @PrefixGameTestTemplate(false)
 class HeatPipeGameTests {
+    @GameTest(template = "coolant_exchanger", timeoutTicks = 20)
+    fun directBlockInsertionEnrollsPipeBeforeReload(helper: GameTestHelper) {
+        val relative = BlockPos(1, 1, 1)
+        val absolute = helper.absolutePos(relative)
+        helper.level.setBlockAndUpdate(absolute, HeatSyncRegistries.HEAT_PIPE.get().defaultBlockState())
+        val pipe = helper.level.getBlockEntity(absolute) as? HeatPipeBlockEntity
+
+        helper.succeedIf {
+            helper.assertTrue(pipe != null, "Direct insertion did not create a pipe block entity")
+            helper.assertTrue(
+                HeatSyncPipeThermalController.isEnrolled(helper.level, absolute),
+                "Direct insertion must join thermal scheduling without a reload or placement event"
+            )
+        }
+    }
+
     @GameTest(template = "coolant_exchanger", timeoutTicks = 20)
     fun capabilityHonorsConfiguredBoundsAndSimulation(helper: GameTestHelper) {
         val pipe = placePipe(helper, BlockPos(1, 1, 1))

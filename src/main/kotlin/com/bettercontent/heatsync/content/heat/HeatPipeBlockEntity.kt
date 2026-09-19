@@ -2,6 +2,7 @@ package com.bettercontent.heatsync.content.heat
 
 import com.bettercontent.heatsync.HeatSyncConfig
 import com.bettercontent.heatsync.HeatSyncRegistries
+import com.bettercontent.heatsync.HeatSyncPipeThermalController
 import com.bettercontent.heatsync.api.HeatBlockEntity
 import com.bettercontent.heatsync.api.HeatCapabilities
 import com.bettercontent.heatsync.api.IHeatStorage
@@ -14,6 +15,7 @@ import net.minecraft.network.protocol.Packet
 import net.minecraft.network.protocol.game.ClientGamePacketListener
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket
 import net.minecraft.world.level.Level
+import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.level.block.entity.BlockEntity
 import net.minecraft.world.level.block.state.BlockState
 import net.minecraftforge.common.capabilities.Capability
@@ -25,6 +27,11 @@ class HeatPipeBlockEntity(
 ) : BlockEntity(HeatSyncRegistries.HEAT_PIPE_BLOCK_ENTITY.get(), pos, state), HeatBlockEntity, IHaveGoggleInformation {
     private var heat: Float = neutralHeat()
     private var heatCapability: LazyOptional<IHeatStorage> = LazyOptional.of { this }
+
+    override fun onLoad() {
+        super.onLoad()
+        (level as? ServerLevel)?.let { HeatSyncPipeThermalController.enroll(it, blockPos) }
+    }
 
     override fun load(tag: CompoundTag) {
         super.load(tag)
