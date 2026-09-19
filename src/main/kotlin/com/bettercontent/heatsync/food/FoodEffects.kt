@@ -24,6 +24,14 @@ object FoodItems {
     val ITEMS: DeferredRegister<Item> = DeferredRegister.create(ForgeRegistries.ITEMS, HeatSyncMod.MOD_ID)
     val SPOILED_MEAT: RegistryObject<Item> = ITEMS.register("spoiled_meat") { Item(Item.Properties().food(FoodProperties.Builder().nutrition(1).saturationMod(0.1f).meat().build())) }
     val SPOILED_PRODUCE: RegistryObject<Item> = ITEMS.register("spoiled_produce") { Item(Item.Properties().food(FoodProperties.Builder().nutrition(1).saturationMod(0.1f).build())) }
+    private fun dried(nutrition: Int, saturation: Float) = Item(Item.Properties().food(FoodProperties.Builder().nutrition(nutrition).saturationMod(saturation).meat().build()))
+    val DRIED_BEEF = ITEMS.register("dried_beef") { dried(4, 0.4f) }
+    val DRIED_PORKCHOP = ITEMS.register("dried_porkchop") { dried(4, 0.4f) }
+    val DRIED_CHICKEN = ITEMS.register("dried_chicken") { dried(3, 0.3f) }
+    val DRIED_MUTTON = ITEMS.register("dried_mutton") { dried(3, 0.3f) }
+    val DRIED_RABBIT = ITEMS.register("dried_rabbit") { dried(3, 0.3f) }
+    val DRIED_COD = ITEMS.register("dried_cod") { dried(2, 0.2f) }
+    val DRIED_SALMON = ITEMS.register("dried_salmon") { dried(3, 0.3f) }
 }
 
 private class SystemDrainEffect(color: Int, private val diet: Boolean) : MobEffect(MobEffectCategory.HARMFUL, color) {

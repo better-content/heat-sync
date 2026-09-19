@@ -1,4 +1,11 @@
 {
+  "item.heat_sync.dried_beef": "Dried Beef",
+  "item.heat_sync.dried_porkchop": "Dried Porkchop",
+  "item.heat_sync.dried_chicken": "Dried Chicken",
+  "item.heat_sync.dried_mutton": "Dried Mutton",
+  "item.heat_sync.dried_rabbit": "Dried Rabbit",
+  "item.heat_sync.dried_cod": "Dried Cod",
+  "item.heat_sync.dried_salmon": "Dried Salmon",
   "block.heat_sync.coolant_exchanger": "Coolant Exchanger",
   "block.heat_sync.creative_heat_source": "Creative Heat Source",
   "block.heat_sync.creative_cold_source": "Creative Cold Source",

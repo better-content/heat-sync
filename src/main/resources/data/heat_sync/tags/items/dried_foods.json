@@ -1,12 +1,12 @@
 {
   "replace": false,
   "values": [
-    "hexerei:dried_belladonna_flowers",
-    "hexerei:dried_mandrake_flowers",
-    "hexerei:dried_mugwort_flowers",
-    "hexerei:dried_mugwort_leaves",
-    "hexerei:dried_sage",
-    "hexerei:dried_yellow_dock_flowers",
-    "hexerei:dried_yellow_dock_leaves"
+    "heat_sync:dried_beef",
+    "heat_sync:dried_porkchop",
+    "heat_sync:dried_chicken",
+    "heat_sync:dried_mutton",
+    "heat_sync:dried_rabbit",
+    "heat_sync:dried_cod",
+    "heat_sync:dried_salmon"
   ]
 }
