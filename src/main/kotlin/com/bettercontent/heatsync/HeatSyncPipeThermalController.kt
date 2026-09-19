@@ -90,6 +90,10 @@ object HeatSyncPipeThermalController {
         trackedPipePositions(level).add(pos.asLong())
     }
 
+    fun unenroll(level: ServerLevel, pos: BlockPos) {
+        trackedPipePositionsByLevel[level.dimension()]?.remove(pos.asLong())
+    }
+
     internal fun isEnrolled(level: ServerLevel, pos: BlockPos): Boolean =
         trackedPipePositionsByLevel[level.dimension()]?.contains(pos.asLong()) == true
 

@@ -33,6 +33,11 @@ class HeatPipeBlockEntity(
         (level as? ServerLevel)?.let { HeatSyncPipeThermalController.enroll(it, blockPos) }
     }
 
+    override fun setRemoved() {
+        (level as? ServerLevel)?.let { HeatSyncPipeThermalController.unenroll(it, blockPos) }
+        super.setRemoved()
+    }
+
     override fun load(tag: CompoundTag) {
         super.load(tag)
         heat = if (tag.contains(HEAT_KEY)) boundedHeat(tag.getFloat(HEAT_KEY)) else neutralHeat()
