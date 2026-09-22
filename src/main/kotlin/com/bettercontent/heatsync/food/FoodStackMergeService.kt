@@ -122,9 +122,7 @@ object FoodStackMergeService {
         val tau = if (values.targetAppliance) APPLIANCE_TAU_TICKS else WORLD_TAU_TICKS
         val temperatureK = targetK + (values.temperatureK - targetK) * exp(-elapsed / tau)
         val days = FoodThermalService.profile(stack).days
-        val decay = if (days != null) {
-            values.decay + elapsed * values.preservationRate / (days * 24000.0)
-        } else values.decay
+        val decay = FoodAgePolicy.advanceDecay(values.decay, elapsed, values.preservationRate, days)
         return values.copy(temperatureK = temperatureK, decay = decay.coerceIn(0.0, 2.5), lastTime = commonTime)
     }
 

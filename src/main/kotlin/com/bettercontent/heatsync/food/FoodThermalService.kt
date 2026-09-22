@@ -114,15 +114,7 @@ object FoodThermalService {
         ?.takeIf { it.getInt(VERSION) == CURRENT_VERSION || it.getInt(VERSION) == 3 }
 
     fun stage(stack: ItemStack): Stage {
-        // Float accumulation may undershoot an exact tick boundary by a few ulps.
-        val value = (stack.tag?.getCompound(KEY)?.getDouble(DECAY) ?: 0.0) + 1.0e-10
-        return when {
-            value >= 2.5 -> Stage.CONVERTED
-            value >= 2.0 -> Stage.ROTTEN
-            value >= 1.5 -> Stage.SPOILED
-            value >= 1.0 -> Stage.STALE
-            else -> Stage.FRESH
-        }
+        return FoodAgePolicy.stage(stack.tag?.getCompound(KEY)?.getDouble(DECAY) ?: 0.0)
     }
 
     fun temperatureK(stack: ItemStack): Double = thermalTag(stack)
@@ -174,8 +166,7 @@ object FoodThermalService {
             // makes a late refrigerator/freezer transition unable to erase warm time.
             val priorRate = if (tag.contains(PRESERVATION_RATE)) tag.getDouble(PRESERVATION_RATE).coerceIn(0.0, 1.0)
             else preservationRate(profile, old)
-            val added = elapsed * priorRate / (days * 24000.0)
-            tag.putDouble(DECAY, (tag.getDouble(DECAY) + added).coerceIn(0.0, 2.5))
+            tag.putDouble(DECAY, FoodAgePolicy.advanceDecay(tag.getDouble(DECAY), elapsed, priorRate, days))
         }
         tag.putLong(LAST_TIME, gameTime)
         tag.putInt(LAST_TARGET_BUCKET, bucketForKelvin(targetK))
