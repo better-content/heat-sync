@@ -25,6 +25,20 @@ class FoodStackMergeServiceTest {
         assertEquals(0.5035, FoodStackMergeService.weighted(destination, 1, source, 1).decay, 1.0e-9)
     }
 
+    @Test
+    fun `successive partial transfers preserve the count weighted aggregate`() {
+        val original = values(temperatureK = 273.15, decay = 0.2, lastTime = 10)
+        val firstTransfer = values(temperatureK = 313.15, decay = 0.5, lastTime = 20)
+        val secondTransfer = values(temperatureK = 373.15, decay = 0.8, lastTime = 30)
+
+        val afterFirst = FoodStackMergeService.weighted(original, 3, firstTransfer, 1)
+        val afterSecond = FoodStackMergeService.weighted(afterFirst, 4, secondTransfer, 2)
+
+        assertEquals((273.15 * 3 + 313.15 + 373.15 * 2) / 6, afterSecond.temperatureK, 1.0e-9)
+        assertEquals((0.2 * 3 + 0.5 + 0.8 * 2) / 6, afterSecond.decay, 1.0e-9)
+        assertEquals(30, afterSecond.lastTime)
+    }
+
     private fun values(temperatureK: Double, decay: Double, lastTime: Long) =
         FoodStackMergeService.ThermalValues(
             temperatureK,
