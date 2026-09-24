@@ -19,4 +19,7 @@ internal object FoodAgePolicy {
             else -> FoodThermalService.Stage.FRESH
         }
     }
+
+    fun remainsFresh(decay: Double, elapsedTicks: Long, preservationRate: Double, lifetimeDays: Double?): Boolean =
+        stage(advanceDecay(decay, elapsedTicks, preservationRate, lifetimeDays)) == FoodThermalService.Stage.FRESH
 }

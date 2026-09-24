@@ -2,6 +2,9 @@ package com.bettercontent.heatsync.food
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotSame
+import net.minecraft.world.item.ItemStack
+import net.minecraft.world.item.Items
 
 class FoodAgePolicyTest {
     private val ordinary = FoodThermalService.Profile("raw_animal", 1.0, 0.0, true)
@@ -15,6 +18,23 @@ class FoodAgePolicyTest {
         assertEquals(0.1, FoodThermalService.preservationRate(dried, 295.15))
         assertEquals(0.0, FoodThermalService.preservationRate(ordinary, 268.15))
         assertEquals(0.0, FoodThermalService.preservationRate(stable, 295.15))
+    }
+
+    @Test
+    fun dryingCopiesTheCompletePersistedFoodThermalState() {
+        TestMinecraftBootstrap.bootstrap()
+        val input = ItemStack(Items.BEEF)
+        val sourceState = FoodThermalService.state(input, 291.15, 240L)
+        sourceState.putDouble("decay", 0.375)
+        sourceState.putDouble("temperature_precise_k", 289.75)
+        val expected = sourceState.copy()
+        val output = ItemStack(Items.BEEF)
+
+        FoodThermalService.carryDryingState(input, output)
+
+        val copied = requireNotNull(output.tag).getCompound("heat_sync_food")
+        assertEquals(expected, copied)
+        assertNotSame(sourceState, copied)
     }
 
     @Test

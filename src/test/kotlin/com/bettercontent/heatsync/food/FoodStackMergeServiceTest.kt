@@ -1,9 +1,40 @@
 package com.bettercontent.heatsync.food
 
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import net.minecraft.nbt.CompoundTag
+import net.minecraft.world.item.ItemStack
+import net.minecraft.world.item.Items
 
 class FoodStackMergeServiceTest {
+    @Test
+    fun `actual partial ItemStack merge weights moved count and preserves stack ownership`() {
+        TestMinecraftBootstrap.bootstrap()
+        val destination = ItemStack(Items.APPLE, 3)
+        destination.orCreateTag.putString("better_content_quality", "orchard")
+        destination.orCreateTag.put("better_content_details", CompoundTag().also { it.putInt("grade", 2) })
+        thermal(destination, temperatureK = 273.15, decay = 0.2, lastTime = 100)
+        val destinationNonThermal = destination.tag!!.copy().also { it.remove("heat_sync_food") }
+
+        val source = destination.copy().also {
+            it.count = 2
+            thermal(it, temperatureK = 373.15, decay = 0.8, lastTime = 100)
+        }
+        val sourceBefore = source.copy()
+        val output = destination.copy().also { it.count = 4 } // Native transfer already accepted one item.
+
+        FoodStackMergeService.mergeInto(output, destination, source, movedCount = 1)
+
+        assertEquals(4, output.count)
+        assertEquals(Items.APPLE, output.item)
+        assertEquals(destinationNonThermal, output.tag!!.copy().also { it.remove("heat_sync_food") })
+        val merged = output.tag!!.getCompound("heat_sync_food")
+        assertEquals(298.15, merged.getDouble("temperature_precise_k"), 1.0e-9)
+        assertEquals(0.35, merged.getDouble("decay"), 1.0e-9)
+        assertTrue(ItemStack.matches(source, sourceBefore), "merge bookkeeping must not mutate the source remainder")
+    }
+
     @Test
     fun `weighted values use destination count and actual moved count`() {
         val destination = values(temperatureK = 273.15, decay = 0.2, lastTime = 80)
@@ -49,4 +80,17 @@ class FoodStackMergeServiceTest {
             preservationRate = 1.0,
             present = true,
         )
+
+    private fun thermal(stack: ItemStack, temperatureK: Double, decay: Double, lastTime: Long) {
+        stack.orCreateTag.put("heat_sync_food", CompoundTag().also {
+            it.putInt("version", 4)
+            it.putInt("temperature_bucket_c", FoodStackMergeService.bucketForKelvin(temperatureK))
+            it.putDouble("temperature_precise_k", temperatureK)
+            it.putDouble("decay", decay)
+            it.putLong("last_time", lastTime)
+            it.putInt("last_target_bucket_c", 4)
+            it.putBoolean("last_target_appliance", false)
+            it.putDouble("preservation_rate", 1.0)
+        })
+    }
 }

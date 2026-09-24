@@ -20,6 +20,7 @@ import net.minecraft.world.item.ItemStack
 import net.minecraft.world.level.Level
 import net.minecraft.world.level.block.Blocks
 import net.minecraft.world.level.block.entity.BlockEntity
+import net.minecraft.world.level.block.entity.RandomizableContainerBlockEntity
 import net.minecraft.server.level.ServerLevel
 import net.minecraftforge.common.util.FakePlayer
 import net.minecraftforge.common.capabilities.ForgeCapabilities
@@ -115,6 +116,27 @@ object FoodThermalService {
 
     fun stage(stack: ItemStack): Stage {
         return FoodAgePolicy.stage(stack.tag?.getCompound(KEY)?.getDouble(DECAY) ?: 0.0)
+    }
+
+    /** Checks the settled persisted age without mutating a recipe input during repeated matching. */
+    @JvmStatic
+    fun canDryAt(input: ItemStack, gameTime: Long): Boolean {
+        if (!input.isEdible || !FoodItems.isDriedFoodSource(input)) return false
+        val profile = profile(input)
+        val lifetime = profile.days ?: return true
+        val stored = input.tag?.takeIf { it.contains(KEY) }?.getCompound(KEY) ?: return true
+        val decay = stored.getDouble(DECAY)
+        val elapsed = if (gameTime <= stored.getLong(LAST_TIME)) 0L else
+            runCatching { Math.subtractExact(gameTime, stored.getLong(LAST_TIME)) }.getOrDefault(Long.MAX_VALUE)
+        val rate = if (stored.contains(PRESERVATION_RATE)) {
+            stored.getDouble(PRESERVATION_RATE).coerceIn(0.0, 1.0)
+        } else {
+            val target = if (stored.contains(LAST_TARGET_BUCKET)) {
+                kelvinForBucket(stored.getInt(LAST_TARGET_BUCKET))
+            } else temperatureK(input)
+            preservationRate(profile, target)
+        }
+        return FoodAgePolicy.remainsFresh(decay, elapsed, rate, lifetime)
     }
 
     fun temperatureK(stack: ItemStack): Double = thermalTag(stack)
@@ -317,10 +339,19 @@ object FoodThermalService {
     @JvmStatic
     fun onBlockEntityChanged(blockEntity: BlockEntity) {
         if (blockEntity.level?.isClientSide != false || blockEntity.isRemoved || reconciling.get()) return
-        // A Forge machine can create food without a player opening it. Containers stay
-        // dormant so world-generated loot is not admitted merely because it was loaded.
+        // Machine containers may create food without a player opening them. Keep only
+        // unresolved generated-loot containers dormant until that loot is unpacked.
         if (!blockEntity.persistentData.getBoolean(ACTIVE)) {
-            if (blockEntity is Container || inventoryFingerprint(blockEntity) == 0) return
+            val hasUnopenedLoot = blockEntity is RandomizableContainerBlockEntity &&
+                (blockEntity as com.bettercontent.heatsync.mixin.minecraft.RandomizableContainerBlockEntityAccessor)
+                    .heatSyncLootTable != null
+            // Reading a RandomizableContainerBlockEntity's slots unpacks its loot table.
+            // Check this first so the guard itself cannot turn an unopened container into
+            // an opened one.
+            if (hasUnopenedLoot) return
+            val hasTrackedFood = inventoryFingerprint(blockEntity) != 0
+            if (!hasTrackedFood) return
+            if (!ContainerFoodAdmissionPolicy.shouldActivate(hasTrackedFood, hasUnopenedLoot)) return
             activateInventory(blockEntity, reconcileNow = false)
         }
         reconcileBlockInventory(blockEntity, force = false)

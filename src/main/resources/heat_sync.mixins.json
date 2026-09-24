@@ -17,7 +17,10 @@
     "minecraft.HopperBlockEntityMixin",
     "minecraft.InventoryMixin",
     "minecraft.ItemEntityMixin",
-    "minecraft.SlotMixin"
+    "minecraft.RandomizableContainerBlockEntityAccessor",
+    "minecraft.SlotMixin",
+    "food.FarmersDelightCookingPotRecipeMixin",
+    "food.UbesDelightBakingMatRecipeMixin"
   ],
   "client": [
     "create.client.FanScenesMixin"

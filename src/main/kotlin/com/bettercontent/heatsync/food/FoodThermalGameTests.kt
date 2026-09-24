@@ -4,6 +4,7 @@ import com.bettercontent.heatsync.HeatSyncMod
 import com.bettercontent.heatsync.HeatSyncRegistries
 import com.bettercontent.heatsync.content.heat.ConstantTemperatureBlockEntity
 import com.bettercontent.heatsync.content.heat.ThermalFireboxBlockEntity
+import com.bettercontent.heatsync.mixin.minecraft.RandomizableContainerBlockEntityAccessor
 import net.minecraft.core.BlockPos
 import net.minecraft.gametest.framework.GameTest
 import net.minecraft.gametest.framework.GameTestHelper
@@ -73,10 +74,18 @@ class FoodThermalGameTests {
         val pos = BlockPos(2, 1, 2)
         helper.setBlock(pos, Blocks.BARREL)
         val barrel = requireNotNull(helper.getBlockEntity(pos) as? BarrelBlockEntity)
-        barrel.setItem(0, ItemStack(Items.APPLE))
+        barrel.setLootTable(net.minecraft.resources.ResourceLocation("minecraft", "chests/simple_dungeon"), 17L)
+        helper.assertTrue(
+            (barrel as RandomizableContainerBlockEntityAccessor).heatSyncLootTable != null,
+            "The generated-loot fixture must start with an unresolved loot table",
+        )
+        FoodThermalService.onBlockEntityChanged(barrel)
         helper.succeedIf {
             helper.assertTrue(!FoodThermalService.isActivated(barrel), "An untouched inventory must remain thermally dormant")
-            helper.assertTrue(barrel.getItem(0).tag?.contains("heat_sync_food") != true, "Dormant loot must remain fresh")
+            helper.assertTrue(
+                (barrel as RandomizableContainerBlockEntityAccessor).heatSyncLootTable != null,
+                "The inventory update handler must not unpack the generated loot table",
+            )
         }
     }
 

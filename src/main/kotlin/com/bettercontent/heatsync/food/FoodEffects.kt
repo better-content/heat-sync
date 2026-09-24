@@ -7,8 +7,9 @@ import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.effect.MobEffect
 import net.minecraft.world.effect.MobEffectCategory
 import net.minecraft.world.entity.LivingEntity
-import net.minecraft.world.item.Item
 import net.minecraft.world.food.FoodProperties
+import net.minecraft.world.item.Item
+import net.minecraft.world.item.Items
 import net.minecraftforge.registries.DeferredRegister
 import net.minecraftforge.registries.ForgeRegistries
 import net.minecraftforge.registries.RegistryObject
@@ -24,15 +25,40 @@ object FoodItems {
     val ITEMS: DeferredRegister<Item> = DeferredRegister.create(ForgeRegistries.ITEMS, HeatSyncMod.MOD_ID)
     val SPOILED_MEAT: RegistryObject<Item> = ITEMS.register("spoiled_meat") { Item(Item.Properties().food(FoodProperties.Builder().nutrition(1).saturationMod(0.1f).meat().build())) }
     val SPOILED_PRODUCE: RegistryObject<Item> = ITEMS.register("spoiled_produce") { Item(Item.Properties().food(FoodProperties.Builder().nutrition(1).saturationMod(0.1f).build())) }
-    private fun dried(nutrition: Int, saturation: Float) = Item(Item.Properties().food(FoodProperties.Builder().nutrition(nutrition).saturationMod(saturation).meat().build()))
-    val DRIED_BEEF = ITEMS.register("dried_beef") { dried(4, 0.4f) }
-    val DRIED_PORKCHOP = ITEMS.register("dried_porkchop") { dried(4, 0.4f) }
-    val DRIED_CHICKEN = ITEMS.register("dried_chicken") { dried(3, 0.3f) }
-    val DRIED_MUTTON = ITEMS.register("dried_mutton") { dried(3, 0.3f) }
-    val DRIED_RABBIT = ITEMS.register("dried_rabbit") { dried(3, 0.3f) }
-    val DRIED_COD = ITEMS.register("dried_cod") { dried(2, 0.2f) }
-    val DRIED_SALMON = ITEMS.register("dried_salmon") { dried(3, 0.3f) }
+    internal val DRIED_FOOD_SOURCES = listOf(
+        DriedFoodSource("dried_beef", Items.BEEF),
+        DriedFoodSource("dried_porkchop", Items.PORKCHOP),
+        DriedFoodSource("dried_chicken", Items.CHICKEN),
+        DriedFoodSource("dried_mutton", Items.MUTTON),
+        DriedFoodSource("dried_rabbit", Items.RABBIT),
+        DriedFoodSource("dried_cod", Items.COD),
+        DriedFoodSource("dried_salmon", Items.SALMON),
+    )
+
+    @JvmStatic
+    fun isDriedFoodSource(stack: net.minecraft.world.item.ItemStack): Boolean =
+        DRIED_FOOD_SOURCES.any { stack.`is`(it.rawFood) }
+
+    private val driedFoodItems = DRIED_FOOD_SOURCES.associate { source ->
+        source.outputId to ITEMS.register(source.outputId) {
+            Item(Item.Properties().food(driedFoodProperties(source.rawFood)))
+        }
+    }
+
+    val DRIED_BEEF: RegistryObject<Item> get() = driedFoodItems.getValue("dried_beef")
+    val DRIED_PORKCHOP: RegistryObject<Item> get() = driedFoodItems.getValue("dried_porkchop")
+    val DRIED_CHICKEN: RegistryObject<Item> get() = driedFoodItems.getValue("dried_chicken")
+    val DRIED_MUTTON: RegistryObject<Item> get() = driedFoodItems.getValue("dried_mutton")
+    val DRIED_RABBIT: RegistryObject<Item> get() = driedFoodItems.getValue("dried_rabbit")
+    val DRIED_COD: RegistryObject<Item> get() = driedFoodItems.getValue("dried_cod")
+    val DRIED_SALMON: RegistryObject<Item> get() = driedFoodItems.getValue("dried_salmon")
+
+    internal fun driedFoodProperties(rawFood: Item): FoodProperties = requireNotNull(rawFood.foodProperties) {
+        "Dried food source ${rawFood.descriptionId} must be edible"
+    }
 }
+
+internal data class DriedFoodSource(val outputId: String, val rawFood: Item)
 
 private class SystemDrainEffect(color: Int, private val diet: Boolean) : MobEffect(MobEffectCategory.HARMFUL, color) {
     override fun isDurationEffectTick(duration: Int, amplifier: Int): Boolean = duration % 20 == 0
